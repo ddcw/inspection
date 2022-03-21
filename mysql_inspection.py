@@ -6,7 +6,7 @@ import subprocess
 import paramiko
 
 #版本定义
-VERSION = "0.11"
+VERSION = "0.2"
 
 #作者
 #AUTHOR = "ddcw"

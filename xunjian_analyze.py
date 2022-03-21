@@ -3,8 +3,14 @@ import argparse
 import pandas as pd
 import datetime
 from jinja2 import FileSystemLoader,Environment
+import matplotlib.pyplot as plt
+import base64
+import io
 
-def main(FILE):
+#版本定义
+analyze_version="0.2"
+
+def main(FILE,OUT_FILE):
 	with open(FILE,'r') as f :
 		xunjian = json.load(f)
 	xunjian_result = json.loads(xunjian)
@@ -15,6 +21,7 @@ def main(FILE):
 	START_TIME = xunjian_result["START_TIME"]
 	DATA = xunjian_result["DATA"]
 	HOST_INFO = xunjian_result["HOST_INFO"]
+	mysql_inspection_version = xunjian_result["VERSION"]
 
 	if DBTYPE == "MYSQL":
 		users = pd.DataFrame(DATA["users"], columns=['Host', 'User', 'Select_priv', 'Insert_priv', 'Update_priv', 'Delete_priv', 'Create_priv', 'Drop_priv', 'Reload_priv', 'Shutdown_priv', 'Process_priv', 'File_priv', 'Grant_priv', 'References_priv', 'Index_priv', 'Alter_priv', 'Show_db_priv', 'Super_priv', 'Create_tmp_table_priv', 'Lock_tables_priv', 'Execute_priv', 'Repl_slave_priv', 'Repl_client_priv', 'Create_view_priv', 'Show_view_priv', 'Create_routine_priv', 'Alter_routine_priv', 'Create_user_priv', 'Event_priv', 'Trigger_priv', 'Create_tablespace_priv', 'ssl_type', 'ssl_cipher', 'x509_issuer', 'x509_subject', 'max_questions', 'max_updates', 'max_connections', 'max_user_connections', 'plugin', 'authentication_string', 'password_expired', 'password_last_changed', 'password_lifetime', 'account_locked'])
@@ -153,13 +160,18 @@ def main(FILE):
 		all_plugins = plugins[['PLUGIN_NAME','PLUGIN_STATUS','PLUGIN_TYPE','PLUGIN_TYPE_VERSION','PLUGIN_AUTHOR','LOAD_OPTION']]
 
 		#长时间未更新统计信息的表/索引 本次演示就是2天前
-		over30days_table_static = innodb_table_stats.where(innodb_table_stats['last_update'] < str(datetime.datetime.now() - datetime.timedelta(days=30)), ).dropna()
-		over30days_index_static = innodb_index_stats.where(innodb_index_stats['last_update'] < str(datetime.datetime.now() - datetime.timedelta(days=30)), ).dropna()
+		over30days_table_static = innodb_table_stats.where(innodb_table_stats['last_update'] < str(datetime.datetime.now() - datetime.timedelta(days=30)), ).dropna().drop_duplicates(keep=False)
+		over30days_index_static = innodb_index_stats.where(innodb_index_stats['last_update'] < str(datetime.datetime.now() - datetime.timedelta(days=30)), ).dropna().drop_duplicates(keep=False)
 
 		#变量
 		#print("取部分变量")
 		#print(variables.loc['version','value'])
 		#print(variables.loc['transaction_isolation','value'])
+		innodb_buffer_pool_size = int(variables.loc['innodb_buffer_pool_size','value'])
+		default_storage_engine = variables.loc['default_storage_engine','value']
+		sync_binlog = int(variables.loc['sync_binlog','value'])
+		innodb_flush_log_at_trx_commit = int(variables.loc['innodb_flush_log_at_trx_commit','value'])
+		read_only = variables.loc['read_only','value']
 
 		#状态
 		#print("部分状态信息")
@@ -170,11 +182,19 @@ def main(FILE):
 		#print("主从复制进程状态")
 		#print(slave_status[0][10])
 		#print(slave_status[0][11])
-		Master_Host=slave_status[0][1]
-		Master_Port=slave_status[0][3]
-		Slave_IO_Running=slave_status[0][10]
-		Slave_SQL_Running=slave_status[0][11]
-		Master_Bind=slave_status[0][46]
+		try:
+			Master_Host=slave_status[0][1]
+			Master_Port=slave_status[0][3]
+			Slave_IO_Running=slave_status[0][10]
+			Slave_SQL_Running=slave_status[0][11]
+			Master_Bind=slave_status[0][46]
+		except:
+			Master_Host=""
+			Master_Port=""
+			Slave_IO_Running=""
+			Slave_SQL_Running=""
+			Master_Bind=""
+
 
 
 		#碎片
@@ -213,12 +233,20 @@ def main(FILE):
 		#print(type(repeat_index),repeat_index)
 		#print(type(list(DATA_DIR)),list(DATA_DIR),DATA_DIR.split()[1])
 		#print(type(MEM_TOTAL),MEM_TOTAL,MEM_ALI)
-
+		#print(innodb_buffer_pool_size,MEM_TOTAL)
+		dbcount_df= tables.groupby(['TABLE_SCHEMA']).agg({'DATA_LENGTH':'sum','INDEX_LENGTH':'sum'}).sort_values(by=['DATA_LENGTH','INDEX_LENGTH'], ascending=False)
+		#b64 = base64.b64encode(testaa.plot.bar().get_figure())
+		#testaa.plot.bar().get_figure().savefig("aaa.jpg")
+		tmps_ = io.BytesIO()
+		dbcount_df.plot(kind="bar",yticks=[]).get_figure().savefig(tmps_,format='png', bbox_inches="tight")
+		dbcount_img_base64 = base64.b64encode(tmps_.getvalue()).decode("utf-8").replace("\n", "")
 
 		#渲染模板
 		env = Environment(loader=FileSystemLoader('./')) 
 		template = env.get_template('templates.html')
 		tmp_file = template.render(
+mysql_inspection_version=mysql_inspection_version,
+xunjian_analyze_version=analyze_version,
 author=AUTHOR,
 host=HOST,
 port=PORT,
@@ -228,6 +256,7 @@ server_id=variables.loc['server_id','value'],
 isslave=any(slave_master_info),
 uptime=int(status.loc['Uptime','value']),
 dbcount=tables.groupby(['TABLE_SCHEMA']).agg({'TABLE_NAME':'count','DATA_LENGTH':'sum','INDEX_LENGTH':'sum'}).sort_values(by=['DATA_LENGTH','INDEX_LENGTH'], ascending=False).reset_index(inplace=False).values,
+dbcount_img_base64=dbcount_img_base64,
 no_innodb=tables[~tables.ENGINE.isin(['InnoDB'])][['TABLE_SCHEMA','TABLE_NAME','ENGINE']].values,
 no_primary=no_primary_key.values,
 repeat_index=repeat_index.values,
@@ -254,12 +283,21 @@ relay_dir=RELAY_DIR,
 all_plugins=all_plugins.values,
 cpu_p=CPU_USAGE_100,
 cpu_p_total=CPU_USAGE_100_TOTAL,
-mem_p=round( (MEM_TOTAL - MEM_ALI ) / MEM_TOTAL ,2),
+mem_p=round( (MEM_TOTAL - MEM_ALI ) / MEM_TOTAL * 100 ,2),
 os_detail="{OS_NAME} {PLATFORM} {KERNEL_VERSION}".format(OS_NAME=OS_NAME, PLATFORM=PLATFORM, KERNEL_VERSION=KERNEL_VERSION),
 loadavg=LOAD_AVG,
 lock_top10=lock_top10.values,
+innodb_buffer_pool_size=innodb_buffer_pool_size,
+sys_total_mem=MEM_TOTAL,
+default_storage_engine=default_storage_engine,
+sync_binlog=sync_binlog,
+innodb_flush_log_at_trx_commit=innodb_flush_log_at_trx_commit,
+read_only=read_only,
 )
-		FILE_HTML = '{FILE}.html'.format(FILE=FILE)
+		if OUT_FILE is None:
+			FILE_HTML = '{FILE}.html'.format(FILE=FILE)
+		else:
+			FILE_HTML = OUT_FILE
 		with open(FILE_HTML,'w') as fhtml :
 			fhtml.write(tmp_file)
 		print("分析完成, 结果保存在 {html}".format(html=FILE_HTML))
@@ -271,14 +309,22 @@ lock_top10=lock_top10.values,
 		print("不支持 {DBTYPE}".format(DBTYPE=DBTYPE))
 
 def _argparse():
-	parser = argparse.ArgumentParser(description='Mysql xunjian analyze by ddcw. you can visit https://github.com/ddcw')
-	parser.add_argument('--file', '-f' ,  action='store', dest='file', required=True,   help='need analyze file ')
+	# argparse用法 https://docs.python.org/3/library/argparse.html
+	parser = argparse.ArgumentParser(description='Mysql xunjian analyze by ddcw. you can visit https://github.com/ddcw/inspection')
+	parser.add_argument('--file', '--in-file', '-f', '-i' ,  action='store', dest='file',  help='input file , only json file ')
+	parser.add_argument( action='store', dest='file_', nargs='?',  help='input file , only json file')
+	parser.add_argument('--out-file', '-o' ,  action='store', dest='out_file', nargs='?',  help='output file, only html now. ')
 	parser.add_argument('--version', '-v', '-V', action='store_true', dest="version",   help='VERSION')
 	return parser.parse_args()
 
 if __name__ == '__main__':
 	parser = _argparse()
 	if parser.version :
-		print("Version: 0.1")
+		print("Version: {analyze_version}".format(analyze_version=analyze_version))
+	elif parser.file is None:
+		if parser.file_ is None:
+			print("Please specify input file")
+		else:
+			main(parser.file_, parser.out_file)
 	else:
-		main(parser.file)
+		main(parser.file, parser.out_file)
