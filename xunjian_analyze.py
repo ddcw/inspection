@@ -6,11 +6,12 @@ from jinja2 import FileSystemLoader,Environment
 import matplotlib.pyplot as plt
 import base64
 import io
+import os
 
 #版本定义
 analyze_version="0.2"
 
-def main(FILE,OUT_FILE):
+def main(FILE,OUT_FILE,TEMPLATE_FILE):
 	with open(FILE,'r') as f :
 		xunjian = json.load(f)
 	xunjian_result = json.loads(xunjian)
@@ -136,10 +137,26 @@ def main(FILE,OUT_FILE):
 		#print("主库是: {master}  从库是:{slave}".format(master=slave_master_info[['Host','Port']], slave=processlist.where(processlist['COMMAND']=="Binlog Dump")[["HOST"]].dropna()))
 		#print(tables[["TABLE_SCHEMA","TABLE_NAME",'DATA_LENGTH','INDEX_LENGTH']].sort_values(by=["DATA_LENGTH",'INDEX_LENGTH'], ascending=False).head(10)) #所有表
 
+
+		#一些汇总信息
+		total_db_count = schemata.shape[0]
+		total_table_count = tables.shape[0]
+		total_size = int(tables["DATA_LENGTH"].sum(axis=0))
+		total_conn_count = processlist.shape[0]
+		total_thread_count = threads.shape[0]
+		
+		#当前库的从库信息
+		processlist_slave = processlist.where(processlist['COMMAND']=="Binlog Dump")[["HOST"]].dropna().values
+		if processlist_slave.shape[0] > 0:
+			have_processlist_slave = True
+		else:
+			have_processlist_slave = False
+		
+
 		#重复索引
 		#print("重复索引的表")
 		re_index = statistics[statistics.duplicated(subset=['TABLE_SCHEMA','TABLE_NAME','COLUMN_NAME'],keep=False)]#重复索引 subset根据什么字段判断为重复索引
-		repeat_index=re_index[['TABLE_SCHEMA','TABLE_NAME','INDEX_NAME','COLUMN_NAME']]
+		repeat_index=re_index[['TABLE_SCHEMA','TABLE_NAME','INDEX_NAME','COLUMN_NAME']].sort_values(by=['TABLE_SCHEMA','TABLE_NAME','COLUMN_NAME'],ascending=False)
 
 		#无主键的表
 		#print("无主键/唯一索引的表")
@@ -172,6 +189,13 @@ def main(FILE,OUT_FILE):
 		sync_binlog = int(variables.loc['sync_binlog','value'])
 		innodb_flush_log_at_trx_commit = int(variables.loc['innodb_flush_log_at_trx_commit','value'])
 		read_only = variables.loc['read_only','value']
+		max_connections = int(variables.loc['max_connections','value'])
+		binlog_format = variables.loc['binlog_format','value']
+		binlog_row_image = variables.loc['binlog_row_image','value']
+		log_bin = variables.loc['log_bin','value']
+		innodb_log_file_size = int(variables.loc['innodb_log_file_size','value'])
+		server_uuid = variables.loc['server_uuid','value']
+		innodb_page_size = variables.loc['innodb_page_size','value']
 
 		#状态
 		#print("部分状态信息")
@@ -234,16 +258,94 @@ def main(FILE,OUT_FILE):
 		#print(type(list(DATA_DIR)),list(DATA_DIR),DATA_DIR.split()[1])
 		#print(type(MEM_TOTAL),MEM_TOTAL,MEM_ALI)
 		#print(innodb_buffer_pool_size,MEM_TOTAL)
-		dbcount_df= tables.groupby(['TABLE_SCHEMA']).agg({'DATA_LENGTH':'sum','INDEX_LENGTH':'sum'}).sort_values(by=['DATA_LENGTH','INDEX_LENGTH'], ascending=False)
 		#b64 = base64.b64encode(testaa.plot.bar().get_figure())
 		#testaa.plot.bar().get_figure().savefig("aaa.jpg")
+
+		#开始分析slow log
+		#print(SLOW_LOG)
+		#global first_slow
+		first_slow = True
+		slow_query_tmp = {}
+		slow_query_tmp["Time"] = []
+		slow_query_tmp["User"] = []
+		slow_query_tmp["Query_time"] = []
+		slow_query_tmp["Lock_time"] = []
+		slow_query_tmp["Rows_sent"] = []
+		slow_query_tmp["Rows_examined"] = []
+		slow_query_tmp["sql"] = []
+		tmpsql = ""
+		for x in SLOW_LOG.split("\n"):
+			if first_slow == False:
+				if x[0:8] == "# Time: ":
+					if len(tmpsql) > 10000:
+						slow_query_tmp["sql"].append(tmpsql[0:9999])
+					else:
+						slow_query_tmp["sql"].append(tmpsql)
+					slow_query_tmp["Time"].append(x)
+				elif x[0:13] == "# User@Host: ":
+					slow_query_tmp["User"].append(x)
+				elif x[0:14] == "SET timestamp=":
+					continue;
+				elif x[0:14] == "# Query_time: ":
+					slow_query_tmp["Query_time"].append(float(x.split()[2]))
+					slow_query_tmp["Lock_time"].append(x.split()[4])
+					slow_query_tmp["Rows_sent"].append(x.split()[6])
+					slow_query_tmp["Rows_examined"].append(x.split()[8])
+				else:
+					tmpsql += x
+			elif x[0:8]  == '# Time: ':
+				slow_query_tmp["Time"].append(x)
+				first_slow = False
+			else:
+				continue
+		slow_query_tmp["sql"].append(tmpsql)
+		try:
+			slow_query_tmp_df = pd.DataFrame(slow_query_tmp)
+			slow_query_tmp_df_orderby = slow_query_tmp_df.sort_values(by=['Query_time'],ascending=False).head(20).values
+			have_slow_query_tmp_df_orderby = True
+		except Exception as e:
+			slow_query_tmp_df_orderby = ""
+			have_slow_query_tmp_df_orderby = False
+
+
+		#error log
+		#print(ERROR_LOG)
+		error_log_tmp = {}
+		error_log_tmp["time"] = []
+		error_log_tmp["n"] = []
+		error_log_tmp["error"] = []
+		error_log_tmp["info"] = []
+		have_error_log_tmp_df_orderby = False
+		for x in ERROR_LOG.split("\n"):
+			try:
+				if x.split()[2] == "[ERROR]" :
+					error_log_tmp["time"].append(x.split()[0])
+					error_log_tmp["n"].append(x.split()[1])
+					error_log_tmp["error"].append(x.split()[2])
+					error_log_tmp["info"].append(x.split("[ERROR]")[1])
+					have_error_log_tmp_df_orderby = True
+			except:
+				continue
+		try:
+			error_log_tmp_df = pd.DataFrame(error_log_tmp)
+			error_log_tmp_df_orderby = error_log_tmp_df.tail(20).values
+		except:
+			error_log_tmp_df_orderby=""
+		
+
+
+		#画图 数据库大小
+		dbcount_df= tables.groupby(['TABLE_SCHEMA']).agg({'DATA_LENGTH':'sum','INDEX_LENGTH':'sum'}).sort_values(by=['DATA_LENGTH','INDEX_LENGTH'], ascending=False)
 		tmps_ = io.BytesIO()
 		dbcount_df.plot(kind="bar",yticks=[]).get_figure().savefig(tmps_,format='png', bbox_inches="tight")
 		dbcount_img_base64 = base64.b64encode(tmps_.getvalue()).decode("utf-8").replace("\n", "")
 
-		#渲染模板
-		env = Environment(loader=FileSystemLoader('./')) 
-		template = env.get_template('templates.html')
+		#渲染模板 比较坑, 得把文件拆分为文件路径和文件名字...  FileSystemLoader指定文件的路径
+		(tmp_file_path,tmp_file_name) = os.path.split(TEMPLATE_FILE)
+		if len(tmp_file_path) == 0:
+			tmp_file_path = "./"
+		env = Environment(loader=FileSystemLoader(tmp_file_path)) 
+		template = env.get_template(tmp_file_name)
 		tmp_file = template.render(
 mysql_inspection_version=mysql_inspection_version,
 xunjian_analyze_version=analyze_version,
@@ -253,7 +355,7 @@ port=PORT,
 dbtype=DBTYPE, 
 version=version[0][0], 
 server_id=variables.loc['server_id','value'],
-isslave=any(slave_master_info),
+isslave=any(Master_Host),
 uptime=int(status.loc['Uptime','value']),
 dbcount=tables.groupby(['TABLE_SCHEMA']).agg({'TABLE_NAME':'count','DATA_LENGTH':'sum','INDEX_LENGTH':'sum'}).sort_values(by=['DATA_LENGTH','INDEX_LENGTH'], ascending=False).reset_index(inplace=False).values,
 dbcount_img_base64=dbcount_img_base64,
@@ -293,6 +395,24 @@ default_storage_engine=default_storage_engine,
 sync_binlog=sync_binlog,
 innodb_flush_log_at_trx_commit=innodb_flush_log_at_trx_commit,
 read_only=read_only,
+slow_query_tmp_df_orderby=slow_query_tmp_df_orderby,
+have_slow_query_tmp_df_orderby=have_slow_query_tmp_df_orderby,
+max_connections=max_connections,
+binlog_format=binlog_format,
+log_bin=log_bin,
+binlog_row_image=binlog_row_image,
+innodb_log_file_size=innodb_log_file_size,
+error_log_tmp_df_orderby=error_log_tmp_df_orderby,
+have_error_log_tmp_df_orderby=have_error_log_tmp_df_orderby,
+total_db_count=total_db_count,
+total_table_count=total_table_count,
+total_size=total_size,
+total_conn_count=total_conn_count,
+total_thread_count=total_thread_count,
+have_processlist_slave=have_processlist_slave,
+processlist_slave=processlist_slave,
+server_uuid=server_uuid,
+innodb_page_size=innodb_page_size,
 )
 		if OUT_FILE is None:
 			FILE_HTML = '{FILE}.html'.format(FILE=FILE)
@@ -314,17 +434,21 @@ def _argparse():
 	parser.add_argument('--file', '--in-file', '-f', '-i' ,  action='store', dest='file',  help='input file , only json file ')
 	parser.add_argument( action='store', dest='file_', nargs='?',  help='input file , only json file')
 	parser.add_argument('--out-file', '-o' ,  action='store', dest='out_file', nargs='?',  help='output file, only html now. ')
+	parser.add_argument('--template-file', '-t' ,  action='store', dest='template_file', nargs='?', default="templates.html",  help='template html file ')
 	parser.add_argument('--version', '-v', '-V', action='store_true', dest="version",   help='VERSION')
 	return parser.parse_args()
 
 if __name__ == '__main__':
 	parser = _argparse()
+	if not os.path.exists(parser.template_file):
+		print("模板文件 {file} 不存在".format(file=parser.template_file))
+		exit(1)
 	if parser.version :
 		print("Version: {analyze_version}".format(analyze_version=analyze_version))
 	elif parser.file is None:
 		if parser.file_ is None:
 			print("Please specify input file")
 		else:
-			main(parser.file_, parser.out_file)
+			main(parser.file_, parser.out_file, parser.template_file)
 	else:
-		main(parser.file, parser.out_file)
+		main(parser.file, parser.out_file, parser.template_file)

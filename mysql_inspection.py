@@ -213,7 +213,7 @@ def main(MYSQL_HOST,MYSQL_PORT,MYSQL_USER,MYSQL_PASSWORD, SAVED_FILE, NO_FILE, S
 		print("(你真棒!) 巡检完成. 巡检结果已保存在 {SAVED_FILE} ".format(SAVED_FILE=SAVED_FILE))
 
 def _argparse():
-	parser = argparse.ArgumentParser(description='Mysql xunjian script by ddcw. you can visit https://github.com/ddcw')
+	parser = argparse.ArgumentParser(description='Mysql xunjian script by ddcw. you can visit https://github.com/ddcw/inspection ')
 	parser.add_argument('--host',  action='store', dest='mysql_host', default='127.0.0.1', help='mysql server ip/host. default 127.0.0.1')
 	parser.add_argument('--port', '-P' ,  action='store', dest='mysql_port', default=3306, type=int , help='mysql server port. default 3306')
 	parser.add_argument('--ssh-port', '-sshP' ,  action='store', dest='ssh_port', default=22, type=int , help='ssh port')

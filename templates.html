@@ -19,14 +19,54 @@ table.tdiff {  border_collapse: collapse; }
 tr:hover   {background-color: yellow;}
 </style>
 
+<style type="text/css">
+            #NavRight{
+                    width:180px;
+                    height:400px;
+                    position:fixed;    right:0px;top:15%;      
+            }
+            #NavRight #NavCon ul li a:hover{
+                                            background:yellow;
+            }
+        </style>
+
 <script type="text/javascript">
 console.log("mysql_inspection 版本为: {{mysql_inspection_version}}")
 console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
+console.log("最新下载地址:  https://github.com/ddcw/inspection")
 </script>
 
 </head>
 <body class="awr">
-<h1 class="awr">
+
+<!-- 右侧固定导航栏  -->
+<div id="NavRight">
+	<div id="NavCon">
+		<ul>
+			<li><a href="#base_parameter">基础参数</a></li>
+			{% if have_host %} <li><a href="#host_info">主机信息</a></li> {% endif %}
+			{% if isslave%} <li><a href="#master_slave_info">主从信息</a></li> {% endif %}
+			<li><a href="#db_tables">数据库信息</a></li>
+			<li><a href="#no_innodb">非Innodb表</a></li>
+			<li><a href="#no_primary">无主键的表</a></li>
+			<li><a href="#repeat_index">重复索引的表</a></li>
+			<li><a href="#no_index">没得索引的表</a></li>
+			<li><a href="#over30_statics">超过30天未跟新统计信息的表</a></li>
+			<li><a href="#over100M_suipian">超过100M碎片的表</a></li>
+			<li><a href="#any_host">任意主机都可登陆的用户</a></li>
+			<li><a href="#top10_con">连接时间最长的10个用户</a></li>
+			<li><a href="#top10_sql">执行次数前10的SQL</a></li>
+			<li><a href="#top10_table">最大的前10张表</a></li>
+			<li><a href="#top10_lock">TOP10 锁等待(锁)</a></li>
+			<li><a href="#all_plugin">所有插件</a></li>
+			{% if have_slow_query_tmp_df_orderby %}<li><a href="#top20_slow">TOP20 慢日志</a></li> {%endif%}
+			{% if have_error_log_tmp_df_orderby %}<li><a href="#latest_20_error_log">LASTET 20 错误日志</a></li> {%endif%}
+		</ul>
+	</div>
+</div>
+
+
+<h1 class="awr" align="center">
 {{dbtype}} {{ host }}:{{port}}
 </h1>
 <p />
@@ -35,41 +75,66 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 		<th class="awrbg" scope="col">数据库类型</th>
 		<th class="awrbg" scope="col">数据库版本</th>
 		<th class="awrbg" scope="col">SERVER ID</th>
+		<th class="awrbg" scope="col">SERVER UUID</th>
 		<th class="awrbg" scope="col">是否为从库</th>
-		<th class="awrbg" scope="col">是否为MGR</th>
 		<th class="awrbg" scope="col">运行时间</th>
 	</tr>
 	<tr>
-		<td >{{dbtype}}</td><td>{{version}}</td>
-		<td >{{server_id}}</td>
-		<td >
+		<td >{{dbtype}}</td>
+		<td>{{version}}</td>
+		<td>{{server_id}}</td>
+		<td>{{server_uuid}}</td>
+		<td>
 {% if isslave%}
-是
+是 (主库地址: {{master_host}})
 {% else %}
 否
 {% endif %}
 		</td>
-		<td>暂不支持</td>
 		<td>{{(uptime / 60 / 60 /24) | round(2)}} 天</td>
 	</tr>
 </table>
 <p />
 
 
-<table border="0" width="50%" class="tdiff" summary="tps_qps_trx">
+<table border="0" width="50%" class="tdiff" >
 <tr>
+	<th class="awrbg" scope="col">数据库</th>
+	<th class="awrbg" scope="col">表</th>
+	<th class="awrbg" scope="col">总大小</th>
+	<th class="awrbg" scope="col">连接数</th>
+	<th class="awrbg" scope="col">线程数</th>
 	<th class="awrbg" scope="col">TPS</th>
 	<th class="awrbg" scope="col">QPS</th>
-	<th class="awrbg" scope="col">事务隔离级别</th>
 </tr>
 <tr>
-	<td >{{tps}}</td>
-	<td >{{qps}}</td>
-	<td >{{transaction_isolation}}</td>
+	<td align="center">{{total_db_count}} 个</td>
+	<td align="center" >{{total_table_count}} 张</td>
+	<td align="center" >{{(total_size / 1024 /1024 / 1024) | round(2)}} GB</td>
+	<td align="center" >{{total_conn_count}}</td>
+	<td align="center" >{{total_thread_count}}</td>
+	<td align="center" >{{tps}}</td>
+	<td align="center" >{{qps}}</td>
 </tr>
 </table>
 
-<h3 class="awr"><a class="awr" name="host"></a>基础参数</h3>
+
+{% if have_processlist_slave %}
+<table border="0" width="35%" class="tdiff" >
+<tr>
+	<th class="awrbg" scope="col">这些主机是本机的从库(也可能是伪装的从库)</th>
+</tr>
+{% for db in processlist_slave %}
+<tr>
+	<td align="center" >{{db[0]}}</td>
+</tr>
+{% endfor %}
+</table>
+{% endif %}
+
+
+
+<h3 class="awr" id="base_parameter"><a class="awr" name="host"></a>基础参数</h3>
 <table border="0" width="50%" class="tdiff" summary="基础参数">
 <tr>
 	<th class="awrbg" scope="col">参数名字</th>
@@ -80,6 +145,11 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 	<td>innodb_buffer_pool_size</td>
 	<td>{{ (innodb_buffer_pool_size | int / 1024 /1024) | round(2) }} MB</td>
 	{% if innodb_buffer_pool_size < (sys_total_mem | int) * 1024 * 0.75  %}<td style="background:yellow">建议增大innodb_buffer_pool_size为75%总内存 ({{ ((sys_total_mem | int) * 1024 * 0.75) | int }}) </td> {%endif%}
+</tr>
+<tr>
+	<td>log_bin</td>
+	<td>{{ log_bin}}</td>
+	{% if log_bin != "ON" and not isslave  %}<td style="background:red">建议开启binlog</td>{%endif%}
 </tr>
 <tr>
 	<td>default_storage_engine</td>
@@ -106,11 +176,39 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 	<td>{{ read_only}}</td>
 	{% if read_only == "OFF" and isslave %}<td style="background:yellow">当前库为从库, 建议设置为只读</td>{%endif%}
 </tr>
+<tr>
+	<td>max_connections</td>
+	<td>{{ max_connections}}</td>
+	{% if max_connections  < 200  %}<td style="background:yellow">当前连接数小于200, 建议至少大于1000</td>{%endif%}
+</tr>
+<tr>
+	<td>binlog_format</td>
+	<td>{{ binlog_format}}</td>
+	{% if binlog_format != "ROW" %}<td style="background:red">当前binlog格式为{{binlog_format}} 建议设置为 ROW</td>{%endif%}
+</tr>
+
+{% if binlog_format == "ROW" %}
+<tr>
+	<td>binlog_row_image</td>
+	<td>{{ binlog_row_image}}</td>
+	{% if binlog_row_image != "FULL" %}<td style="background:yellow">建议设置binlog_row_image=FULL</td>{%endif%}
+</tr>
+{%endif%}
+
+<tr>
+	<td>innodb_log_file_size</td>
+	<td>{{ innodb_log_file_size}}</td>
+	{% if innodb_log_file_size < 536870912 %}<td style="background:yellow">建议设置redolog 1GB, 至少512MB  </td>{%endif%}
+</tr>
+<tr>
+	<td>innodb_page_size</td>
+	<td>{{ innodb_page_size}}</td>
+</tr>
 </table>
 
 
 {% if have_host %}
-<h3 class="awr"><a class="awr" name="host"></a>主机信息</h3>
+<h3 class="awr" id="host_info"><a class="awr" name="host"></a>主机信息</h3>
 <table border="0" width="70%" class="tdiff" summary="主机信息">
 <tr>
 	<th class="awrbg" scope="col"></th>
@@ -142,6 +240,7 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 	<td {% if data_dir[5].split("%")[0] | int > 90 %}style="background:yellow" {% endif %}>{{logbin_dir[5]}}</td>	
 	<td >{{logbin_dir[6]}}</td>	
 </tr>
+{% if isslave %}
 <tr>
 	<td >relay_log目录(relay_log)</td>	
 	<td >{{relay_dir[0]}}</td>	
@@ -152,6 +251,7 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 	<td {% if data_dir[5].split("%")[0] | int > 90 %}style="background:yellow" {% endif %}>{{relay_dir[5]}}</td>	
 	<td >{{relay_dir[6]}}</td>	
 </tr>
+{% endif %}
 </table>
 
 <table border="0" width="70%" class="tdiff">
@@ -176,7 +276,7 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 
 
 {% if isslave %}
-<h3 class="awr"><a class="awr" name="slave_status"></a>主从复制状态</h3>
+<h3 class="awr" id="master_slave_info"><a class="awr" name="slave_status"></a>主从复制状态</h3>
 <table border="0" width="70%" class="tdiff" summary="主从复制状态">
 <tr>
 	<th class="awrbg" scope="col">Master_Host</th>
@@ -188,15 +288,15 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 <tr>
 	<td >{{master_host}}</td>
 	<td >{{master_port}}</td>
-	<td {% if slave_io_running != "YES" %}style="background:red" {% endif %} >{{slave_io_running}}</td>
-	<td {% if slave_sql_running != "YES" %}style="background:red" {% endif %} >{{slave_sql_running}}</td>
+	<td {% if slave_io_running != "Yes" %}style="background:red" {% endif %} >{{slave_io_running}}</td>
+	<td {% if slave_sql_running != "Yes" %}style="background:red" {% endif %} >{{slave_sql_running}}</td>
 	<td {% if master_bind | int > 90 %}style="background:yellow" {% endif %} >{{master_bind}}</td>
 </tr>
 </table>
 {% endif %}
 
 
-<h3 class="awr"><a class="awr" name="huizongxinxi"></a>数据库汇总信息</h3>
+<h3 class="awr" id="db_tables"><a class="awr" name="huizongxinxi"></a>数据库汇总信息</h3>
 <table border="0" width="70%" class="tdiff" summary="数据库汇总信息">
 <tr>
 	<th class="awrbg" scope="col">数据库名</th>
@@ -221,8 +321,8 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 </table>
 <img src="data:image/png;base64,{{dbcount_img_base64}}"  />
 
-<h3 class="awr"><a class="awr" name="not_innodb"></a>非INNODB表</h3>
-<table border="0" width="70%" class="tdiff" summary="非INNODB表">
+<h3 class="awr" id="no_innodb"><a class="awr" name="not_innodb"></a>非INNODB表</h3>
+<table border="0" width="40%" class="tdiff" summary="非INNODB表">
 <tr>
 	<th class="awrbg" scope="col">数据库名</th>
 	<th class="awrbg" scope="col">表名</th>
@@ -242,8 +342,8 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 </table>
 
 
-<h3 class="awr"><a class="awr" name="no_primary"></a>无主键的表</h3>
-<table border="0" width="70%" class="tdiff" summary="无主键的表">
+<h3 class="awr" id="no_primary"><a class="awr" name="no_primary"></a>无主键的表</h3>
+<table border="0" width="40%" class="tdiff" summary="无主键的表">
 <tr>
 	<th class="awrbg" scope="col">数据库名</th>
 	<th class="awrbg" scope="col">表名</th>
@@ -261,8 +361,8 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 </table>
 
 
-<h3 class="awr"><a class="awr" name="repeat_index"></a>重复索引的表</h3>
-<table border="0" width="70%" class="tdiff" summary="重复索引的表">
+<h3 class="awr" id="repeat_index"><a class="awr" name="repeat_index"></a>重复索引的表</h3>
+<table border="0" width="40%" class="tdiff" summary="重复索引的表">
 <tr>
 	<th class="awrbg" scope="col">数据库名</th>
 	<th class="awrbg" scope="col">表名</th>
@@ -284,8 +384,8 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 </table>
 
 
-<h3 class="awr"><a class="awr" name="no_index"></a>没得索引的表</h3>
-<table border="0" width="70%" class="tdiff" summary="没得索引的表">
+<h3 class="awr" id="no_index"><a class="awr" name="no_index"></a>没得索引的表</h3>
+<table border="0" width="40%" class="tdiff" summary="没得索引的表">
 <tr>
 	<th class="awrbg" scope="col">数据库名</th>
 	<th class="awrbg" scope="col">表名</th>
@@ -303,16 +403,24 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 </table>
 
 
-<h3 class="awr"><a class="awr" name="over30days_table_static"></a>超过30天未更新统计信息的表</h3>
+<h3 class="awr" id="over30_statics"><a class="awr" name="over30days_table_static"></a>超过30天未更新统计信息的表</h3>
 <table border="0" width="70%" class="tdiff" summary="超过30天未更新统计信息的表">
 <tr>
 	<th class="awrbg" scope="col">数据库名</th>
 	<th class="awrbg" scope="col">表名</th>
+	<th class="awrbg" scope="col">上次更新时间</th>
+	<th class="awrbg" scope="col">行数(number of rows)</th>
+	<th class="awrbg" scope="col">主索引(clustered_index)页数量({{innodb_page_size}})</th>
+	<th class="awrbg" scope="col">其它索引页数量({{innodb_page_size}})</th>
 </tr>
 {% for db in over30days_table_static%}
 <tr>
 	<td >{{db[0]}}</td>
 	<td >{{db[1]}}</td>
+	<td >{{db[2]}}</td>
+	<td >{{db[3] | int }}</td>
+	<td >{{db[4] | int }}</td>
+	<td >{{db[5] | int }}</td>
 </tr>
 {% else %}
 <tr>
@@ -326,11 +434,21 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 <tr>
 	<th class="awrbg" scope="col">数据库名</th>
 	<th class="awrbg" scope="col">表名</th>
+	<th class="awrbg" scope="col">索引名</th>
+	<th class="awrbg" scope="col">上次更新时间</th>
+	<th class="awrbg" scope="col">stat_name</th>
+	<th class="awrbg" scope="col">stat_value</th>
+	<th class="awrbg" scope="col">stat_description</th>
 </tr>
 {% for db in over30days_index_static%}
 <tr>
 	<td >{{db[0]}}</td>
 	<td >{{db[1]}}</td>
+	<td >{{db[2]}}</td>
+	<td >{{db[3]}}</td>
+	<td >{{db[4]}}</td>
+	<td align="center">{{db[5] | int }}</td>
+	<td >{{db[7]}}</td>
 </tr>
 {% else %}
 <tr>
@@ -340,8 +458,8 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 </table>
 
 
-<h3 class="awr"><a class="awr" name="over_100M_data_free"></a>碎片超过100MB的表</h3>
-<table border="0" width="70%" class="tdiff" summary="碎片超过100MB的表">
+<h3 class="awr" id="over100M_suipian"><a class="awr" name="over_100M_data_free"></a>碎片超过100MB的表</h3>
+<table border="0" width="40%" class="tdiff" summary="碎片超过100MB的表">
 <tr>
 	<th class="awrbg" scope="col">数据库名</th>
 	<th class="awrbg" scope="col">表名</th>
@@ -361,8 +479,8 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 </table>
 
 
-<h3 class="awr"><a class="awr" name="user_any"></a>任意主机都可登陆的用户</h3>
-<table border="0" width="70%" class="tdiff" summary="任意主机都可登陆的用户">
+<h3 class="awr" id="any_host"><a class="awr" name="user_any"></a>任意主机都可登陆的用户</h3>
+<table border="0" width="40%" class="tdiff" summary="任意主机都可登陆的用户">
 <tr>
 	<th class="awrbg" scope="col">用户名</th>
 	<th class="awrbg" scope="col">主机名</th>
@@ -380,7 +498,7 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 </table>
 
 
-<h3 class="awr"><a class="awr" name="session_top10"></a>连接时间最长的10个用户</h3>
+<h3 class="awr" id="top10_con"><a class="awr" name="session_top10"></a>连接时间最长的10个用户</h3>
 <table border="0" width="70%" class="tdiff" summary="连接时间最长的10个用户">
 <tr>
 	<th class="awrbg" scope="col">用户名</th>
@@ -410,7 +528,7 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 
 
 
-<h3 class="awr"><a class="awr" name="exec_sql_top10"></a>执行次数前10的SQL</h3>
+<h3 class="awr" id="top10_sql"><a class="awr" name="exec_sql_top10"></a>执行次数前10的SQL</h3>
 <table border="0" width="70%" class="tdiff" summary="执行次数前10的SQL">
 <tr>
 	<th class="awrbg" scope="col">SQL语句</th>
@@ -447,7 +565,7 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 </table>
 
 
-<h3 class="awr"><a class="awr" name="table_top10"></a>最大的前10张表</h3>
+<h3 class="awr" id="top10_table"><a class="awr" name="table_top10"></a>最大的前10张表</h3>
 <table border="0" width="70%" class="tdiff" summary="前10大的表">
 <tr>
 	<th class="awrbg" scope="col">数据库名</th>
@@ -474,7 +592,7 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 </table>
 
 
-<h3 class="awr"><a class="awr" name="lock_top10"></a>前10的锁等待(锁)</h3>
+<h3 class="awr" id="top10_lock"><a class="awr" name="lock_top10"></a>前10的锁等待(锁)</h3>
 <table border="0" width="70%" class="tdiff" >
 <tr>
 	<th class="awrbg" scope="col">库表</th>
@@ -504,7 +622,7 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 
 
 
-<h3 class="awr"><a class="awr" name="all_plugins"></a>所有插件</h3>
+<h3 id="all_plugin" class="awr" id="top20_slow"><a class="awr" name="all_plugins"></a>所有插件</h3>
 <table border="0" width="70%" class="tdiff">
 <tr>
 	<th class="awrbg" scope="col">插件名字</th>
@@ -529,6 +647,56 @@ console.log("xunjian_analyze 版本为: {{xunjian_analyze_version}}")
 </tr>
 {%endfor%}
 </table>
+
+
+{% if have_slow_query_tmp_df_orderby %}
+<h3 id="top20_slow" class="awr"><a class="awr" name="slow_log"></a>TOP20 慢日志</h3>
+<table border="0" width="70%" class="tdiff">
+<tr>
+	<th class="awrbg" scope="col">Time</th>
+	<th class="awrbg" scope="col">User_Host</th>
+	<th class="awrbg" scope="col">Query_time</th>
+	<th class="awrbg" scope="col">Lock_time</th>
+	<th class="awrbg" scope="col">Rows_sent</th>
+	<th class="awrbg" scope="col">Rows_examined</th>
+	<th class="awrbg" scope="col">sql</th>
+</tr>
+{% for db in slow_query_tmp_df_orderby %}
+<tr>
+	<td >{{db[0]}}</td>
+	<td >{{db[1]}}</td>
+	<td >{{db[2]}}</td>
+	<td >{{db[3]}}</td>
+	<td >{{db[4]}}</td>
+	<td >{{db[5]}}</td>
+	<td ><textarea>{{db[6]}}</textarea></td>
+</tr>
+{% else %}
+<tr>
+<td >没得</td>
+</tr>
+{% endfor %}
+</table>
+{% endif %}
+
+{% if have_error_log_tmp_df_orderby %}
+<h3 id="latest_20_error_log" class="awr"><a class="awr" name="slow_log"></a>LASTET 20 错误日志</h3>
+<table border="0" width="70%" class="tdiff">
+<tr>
+	<th class="awrbg" scope="col">Time</th>
+	<th class="awrbg" scope="col">error</th>
+	<th class="awrbg" scope="col">info</th>
+	
+</tr>
+{% for db in error_log_tmp_df_orderby %}
+<tr>
+	<td >{{db[0]}}</td>
+	<td >{{db[2]}}</td>
+	<td >{{db[3]}}</td>
+</tr>
+{% endfor %}
+</table>
+{% endif %}
 
 </body>
 </html>
