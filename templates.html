@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,7 +22,7 @@ tr:hover   {background-color: yellow;}
 
 <style type="text/css">
             #NavRight{
-                    width:180px;
+                    width:222px;
                     height:400px;
                     position:fixed;    right:0px;top:15%;      
             }
@@ -51,16 +52,22 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 			<li><a href="#no_primary">无主键的表</a></li>
 			<li><a href="#repeat_index">重复索引的表</a></li>
 			<li><a href="#no_index">没得索引的表</a></li>
-			<li><a href="#over30_statics">超过30天未跟新统计信息的表</a></li>
+			<li><a href="#over_5_index">索引数量超过5的表</a></li>
+			<li><a href="#over30_statics">过期统计信息</a></li>
 			<li><a href="#over100M_suipian">超过100M碎片的表</a></li>
-			<li><a href="#any_host">任意主机都可登陆的用户</a></li>
-			<li><a href="#top10_con">连接时间最长的10个用户</a></li>
-			<li><a href="#top10_sql">执行次数前10的SQL</a></li>
-			<li><a href="#top10_table">最大的前10张表</a></li>
-			<li><a href="#top10_lock">TOP10 锁等待(锁)</a></li>
+			<li><a href="#any_host">主机为%的用户</a></li>
 			<li><a href="#all_plugin">所有插件</a></li>
+			<li><a href="#top20_Pro">TOP20_Processlist</a></li>
+			<!--  <li><a href="#top10_sql">执行次数前10的SQL</a></li>  -->
+			<li><a href="#top20_table">TOP20_TABLE</a></li>
+			<li><a href="#top20_lock">TOP20 LOCK</a></li>
 			{% if have_slow_query_tmp_df_orderby %}<li><a href="#top20_slow">TOP20 慢日志</a></li> {%endif%}
 			{% if have_error_log_tmp_df_orderby %}<li><a href="#latest_20_error_log">LASTET 20 错误日志</a></li> {%endif%}
+			<li><a href="#top20_open_tables">TOP20_OPEN_TABLES</a></li>
+			<li><a href="#top20_wait_events">TOP20_WAIT_EVENTS</a></li>
+			<li><a href="#top20_metadata_locks">TOP20_METADATA_LOCKS</a></li>
+			<li><a href="#top20_accounts">TOP20_ACCOUNTS</a></li>
+			<li><a href="#top20_sql">TOP20_SQL</a></li>
 		</ul>
 	</div>
 </div>
@@ -86,7 +93,7 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 		<td>{{server_uuid}}</td>
 		<td>
 {% if isslave%}
-是 (主库地址: {{master_host}})
+是 (主库地址: {{master_host}}:{{master_port}})
 {% else %}
 否
 {% endif %}
@@ -169,7 +176,7 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 <tr>
 	<td>transaction_isolation</td>
 	<td>{{ transaction_isolation}}</td>
-	{% if transaction_isolation != "REPEATABLE-COMMIT" %}<td style="background:yellow">建议设置 transaction_isolation = "REPEATABLE-COMMIT"</td>{%endif%}
+	{% if transaction_isolation != "READ-COMMITTED" %}<td style="background:yellow">建议设置 transaction_isolation = "READ-COMMITTED"</td>{%endif%}
 </tr>
 <tr>
 	<td>read_only</td>
@@ -273,6 +280,24 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 {% endif %}
 
 
+{% if have_disk_type %}
+<table border="0" width="20%" class="tdiff">
+<tr>
+	<th class="awrbg" scope="col">磁盘名字</th>
+	<th class="awrbg" scope="col">是否为固态</th>
+</tr>
+{% for db in disk_type %}
+<tr>
+	<td >{{db[0]}}</td>
+	{% if db[1] == '0' %}
+	<td > 固态 </td>
+	{%else%}
+	<td > 机械 </td>
+	{%endif%}
+</tr>
+{% endfor %}
+</table>
+{% endif %}
 
 
 {% if isslave %}
@@ -402,6 +427,25 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 {% endfor %}
 </table>
 
+<h3 class="awr" id="over_5_index"><a class="awr" ></a>索引数量超过5的表</h3>
+<table border="0" width="40%" class="tdiff" >
+<tr>
+	<th class="awrbg" scope="col">数据库名</th>
+	<th class="awrbg" scope="col">表名</th>
+	<th class="awrbg" scope="col">索引数量</th>
+</tr>
+{% for db in over_5_index %}
+<tr>
+	<td >{{db[0]}}</td>
+	<td >{{db[1]}}</td>
+	<td >{{db[2]}}</td>
+</tr>
+{% else %}
+<tr>
+        <td >没得</td>
+</tr>
+{% endfor %}
+</table>
 
 <h3 class="awr" id="over30_statics"><a class="awr" name="over30days_table_static"></a>超过30天未更新统计信息的表</h3>
 <table border="0" width="70%" class="tdiff" summary="超过30天未更新统计信息的表">
@@ -498,8 +542,8 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 </table>
 
 
-<h3 class="awr" id="top10_con"><a class="awr" name="session_top10"></a>连接时间最长的10个用户</h3>
-<table border="0" width="70%" class="tdiff" summary="连接时间最长的10个用户">
+<h3 class="awr" id="top20_Pro"><a class="awr" ></a>TOP20_Processlist</h3>
+<table border="0" width="70%" class="tdiff" >
 <tr>
 	<th class="awrbg" scope="col">用户名</th>
 	<th class="awrbg" scope="col">来源主机</th>
@@ -509,7 +553,7 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 	<th class="awrbg" scope="col">连接状态</th>
 	<th class="awrbg" scope="col">SQL语句</th>
 </tr>
-{% for db in session_top10%}
+{% for db in session_top20%}
 <tr>
 	<td >{{db[0]}}</td>
 	<td >{{db[1]}}</td>
@@ -528,6 +572,7 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 
 
 
+<!--
 <h3 class="awr" id="top10_sql"><a class="awr" name="exec_sql_top10"></a>执行次数前10的SQL</h3>
 <table border="0" width="70%" class="tdiff" summary="执行次数前10的SQL">
 <tr>
@@ -563,10 +608,10 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 </tr>
 {% endfor %}
 </table>
+-->
 
-
-<h3 class="awr" id="top10_table"><a class="awr" name="table_top10"></a>最大的前10张表</h3>
-<table border="0" width="70%" class="tdiff" summary="前10大的表">
+<h3 class="awr" id="top20_table"><a class="awr" ></a>TOP20 TABLES</h3>
+<table border="0" width="70%" class="tdiff" summary="最大的前20张表">
 <tr>
 	<th class="awrbg" scope="col">数据库名</th>
 	<th class="awrbg" scope="col">表名</th>
@@ -575,7 +620,7 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 	<th class="awrbg" scope="col">索引大小</th>
 	<th class="awrbg" scope="col">总大小</th>
 </tr>
-{% for db in table_top10%}
+{% for db in table_top20%}
 <tr>
 	<td >{{db[0]}}</td>
 	<td >{{db[1]}}</td>
@@ -592,7 +637,7 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 </table>
 
 
-<h3 class="awr" id="top10_lock"><a class="awr" name="lock_top10"></a>前10的锁等待(锁)</h3>
+<h3 class="awr" id="top20_lock"><a class="awr" name="lock_top20"></a>TOP20_LOCK</h3>
 <table border="0" width="70%" class="tdiff" >
 <tr>
 	<th class="awrbg" scope="col">库表</th>
@@ -603,7 +648,7 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 	<th class="awrbg" scope="col">阻塞SQL</th>
 	<th class="awrbg" scope="col">sql_kill_blocking_query</th>
 </tr>
-{% for db in lock_top10%}
+{% for db in lock_top20%}
 <tr>
 	<td >{{db[0]}}</td>
 	<td >{{db[1]}}</td>
@@ -653,23 +698,36 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 <h3 id="top20_slow" class="awr"><a class="awr" name="slow_log"></a>TOP20 慢日志</h3>
 <table border="0" width="70%" class="tdiff">
 <tr>
-	<th class="awrbg" scope="col">Time</th>
-	<th class="awrbg" scope="col">User_Host</th>
-	<th class="awrbg" scope="col">Query_time</th>
-	<th class="awrbg" scope="col">Lock_time</th>
-	<th class="awrbg" scope="col">Rows_sent</th>
-	<th class="awrbg" scope="col">Rows_examined</th>
+	<th class="awrbg" scope="col">执行次数</th>
+	<th class="awrbg" scope="col">Query_time_avg</th>
+	<th class="awrbg" scope="col">Query_time_max</th>
+	<th class="awrbg" scope="col">Query_time_median</th>
+	<th class="awrbg" scope="col">Query_time_pct_95</th>
+	<th class="awrbg" scope="col">数据库</th>
+	<th class="awrbg" scope="col">checksum</th>
 	<th class="awrbg" scope="col">sql</th>
 </tr>
 {% for db in slow_query_tmp_df_orderby %}
 <tr>
-	<td >{{db[0]}}</td>
 	<td >{{db[1]}}</td>
 	<td >{{db[2]}}</td>
 	<td >{{db[3]}}</td>
-	<td >{{db[4]}}</td>
 	<td >{{db[5]}}</td>
-	<td ><textarea>{{db[6]}}</textarea></td>
+	<td >{{db[6]}}</td>
+	<td >{{db[7]}}</td>
+	<!--  <td ><textarea>{{db[8]}}</textarea></td> -->
+	<td >{{db[0]}}</td>
+{%if (db[8] | length) > 200 %}
+	<!--  <td ><button type="button" onclick="alert('{{db[8]}}')">sql太长, 请点击查看sql</button></td> -->
+	<td>
+	<details>
+		<summary>SQL太长, 请点击查看详情</summary>
+		<p>{{db[8]}}</p>
+	</details>
+	</td>
+{%else%}
+	<td >{{db[8]}}')"</td>
+{%endif%}
 </tr>
 {% else %}
 <tr>
@@ -697,6 +755,138 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 {% endfor %}
 </table>
 {% endif %}
+
+
+
+<h3 id="top20_open_tables" class="awr"><a class="awr" ></a>打开次数前20的表</h3>
+<table border="0" width="50%" class="tdiff">
+<tr>
+	<th class="awrbg" scope="col">数据库名</th>
+	<th class="awrbg" scope="col">表名</th>
+	<th class="awrbg" scope="col">打开次数</th>
+	
+</tr>
+{% for db in top20_open_tables %}
+<tr>
+	<td >{{db[0]}}</td>
+	<td >{{db[1]}}</td>
+	<td >{{db[2]}}</td>
+</tr>
+{% endfor %}
+</table>
+
+<h3 id="top20_wait_events" class="awr"><a class="awr" ></a>TOP20_WAIT_EVENTS</h3>
+<table border="0" width="70%" class="tdiff">
+<tr>
+	<th class="awrbg" scope="col">EVENT_NAME</th>
+	<th class="awrbg" scope="col">COUNT_STAR</th>
+	<th class="awrbg" scope="col">SUM_TIMER_WAIT</th>
+	<th class="awrbg" scope="col">MIN_TIMER_WAIT</th>
+	<th class="awrbg" scope="col">AVG_TIMER_WAIT</th>
+	<th class="awrbg" scope="col">MAX_TIMER_WAIT</th>
+	
+</tr>
+{% for db in top20_wait_events%}
+<tr>
+	<td >{{db[0]}}</td>
+	<td >{{db[1]}}</td>
+	<td >{{db[2]}}</td>
+	<td >{{db[3]}}</td>
+	<td >{{db[4]}}</td>
+	<td >{{db[5]}}</td>
+</tr>
+{% endfor %}
+</table>
+
+
+<h3 id="top20_metadata_locks" class="awr"><a class="awr" ></a>TOP20_METADATA_LOCKS</h3>
+<table border="0" width="70%" class="tdiff">
+<tr>
+	<th class="awrbg" scope="col">OBJECT_TYPE</th>
+	<th class="awrbg" scope="col">OBJECT_SCHEMA</th>
+	<th class="awrbg" scope="col">OBJECT_NAME</th>
+	<th class="awrbg" scope="col">OBJECT_INSTANCE_BEGIN</th>
+	<th class="awrbg" scope="col">LOCK_TYPE</th>
+	<th class="awrbg" scope="col">LOCK_DURATION</th>
+	<th class="awrbg" scope="col">LOCK_STATUS</th>
+	<th class="awrbg" scope="col">SOURCE</th>
+	<th class="awrbg" scope="col">OWNER_THREAD_ID</th>
+	<th class="awrbg" scope="col">OWNER_EVENT_ID</th>
+	
+</tr>
+{% for db in top20_metadata_locks%}
+<tr>
+	<td >{{db[0]}}</td>
+	<td >{{db[1]}}</td>
+	<td >{{db[2]}}</td>
+	<td >{{db[3]}}</td>
+	<td >{{db[4]}}</td>
+	<td >{{db[5]}}</td>
+	<td >{{db[6]}}</td>
+	<td >{{db[7]}}</td>
+	<td >{{db[8]}}</td>
+	<td >{{db[9]}}</td>
+</tr>
+{% endfor %}
+</table>
+
+
+
+<h3 id="top20_accounts" class="awr"><a class="awr" ></a>TOP20_ACCOUNTS</h3>
+<table border="0" width="50%" class="tdiff">
+<tr>
+	<th class="awrbg" scope="col">USER</th>
+	<th class="awrbg" scope="col">HOST</th>
+	<th class="awrbg" scope="col">CURRENT_CONNECTIONS</th>
+	<th class="awrbg" scope="col">TOTAL_CONNECTIONS</th>
+	
+</tr>
+{% for db in top20_accounts%}
+<tr>
+	<td >{{db[0]}}</td>
+	<td >{{db[1]}}</td>
+	<td >{{db[2]}}</td>
+	<td >{{db[3]}}</td>
+</tr>
+{% endfor %}
+</table>
+
+
+<h3 id="top20_sql" class="awr"><a class="awr" ></a>TOP20_SQL</h3>
+<table border="0" width="70%" class="tdiff">
+<tr>
+	<th class="awrbg" scope="col">数据库名</th>
+	<th class="awrbg" scope="col">执行次数</th>
+	<th class="awrbg" scope="col">第一次执行时间</th>
+	<th class="awrbg" scope="col">最后一次执行时间</th>
+	<th class="awrbg" scope="col">总影响行数</th>
+	<th class="awrbg" scope="col">SQL摘要(脱敏)</th>
+	
+</tr>
+{% for db in top20_sql%}
+<tr>
+	<td >{{db[0]}}</td>
+	<td >{{db[3]}}</td>
+	<td >{{db[27]}}</td>
+	<td >{{db[28]}}</td>
+	<td >{{db[11]}}</td>
+{%if (db[2] | length) > 500 %}
+	<td>
+	<details>
+		<summary>SQL太长, 请点击查看详情</summary>
+		<p>{{db[2]}}</p>
+	</details>
+	</td>
+{%else%}
+	<td >{{db[2]}}')"</td>
+{%endif%}
+</tr>
+{% endfor %}
+</table>
+
+
+
+
 
 </body>
 </html>
