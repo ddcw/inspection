@@ -1,0 +1,16 @@
+{
+"VERSION":"1.0",
+"PARALLEL":2,
+"TEST_ONLY":"False",
+"DEFAULT_HOST":"127.0.0.1",
+"DEFAULT_PORT":"3306",
+"DEFAULT_USER":"root",
+"DEFAULT_PASSWORD":"123456",
+"DEFAULT_SSH_PORT":22,
+"DEFAULT_SSH_USER":"root",
+"DEFAULT_SSH_PASSWORD":"123456",
+"DATA":[
+	{"host":"192.168.101.51", "port":3312, "user":"root", "password":"123456", "ssh_port":22, "ssh_user":"root", "ssh_password":"123456"},
+	{"host":"192.168.101.19", "port":"3308"}
+	]
+}
