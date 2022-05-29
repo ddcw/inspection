@@ -19,12 +19,13 @@ def db_table():
 	return [
 {
 "table":"mysql.user",
-"exclude_rows":{"password"},
+"exclude_rows":{"password","authentication_string"},
 },
 
 {
 "table":"mysql.slave_master_info",
 "where":"",
+"exclude_rows":{"User_password"},
 },
 
 {

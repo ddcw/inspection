@@ -45,11 +45,11 @@ class set:
 		chart = "<script>" + chartjs.return_chartjs() + "</script>"
 
 		#看下模板文件是否存在,不存在就自动导入(不判断内容...)
-		if not os.path.exists(html_template):  #因为方便测试, 所以加了个恒等的条件, 要删掉
+		if not os.path.exists(html_template) :  #因为方便测试, 所以加了个恒等的条件, 要删掉
 			from . import t_html
 			html_content = t_html.return_content()
 			#print(html_content,"xxxxxxxxx")
-			with open(html_template,'w',1) as f:
+			with open(html_template,'w',1,encoding='utf-8') as f:
 				f.write(html_content)
 
 
@@ -73,7 +73,7 @@ class set:
 
 		#保存巡检报告
 		file_dir_name = str(self.file_dir) + "/" + file_name
-		with open(file_dir_name,'w') as fhtml:
+		with open(file_dir_name,'w',encoding='utf-8') as fhtml:
 			fhtml.write(tmp_file)
 			
 

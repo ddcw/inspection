@@ -110,10 +110,11 @@ class set:
 		#非innodb表
 		try:
 			tables = table_list["information_schema.tables"]
-			not_innodb = table_list["information_schema.tables"][~table_list["information_schema.tables"].ENGINE.isin(['InnoDB'])][['TABLE_SCHEMA','TABLE_NAME','ENGINE']].values #相当于sql: select TABLE_SCHEMA,TABLE_NAME,ENGINE from information_schema.tables where ENGINE not in ('InnoDB')  #系统表在采集数据的时候就已经过滤了...
+			not_innodb = table_list["information_schema.tables"][~table_list["information_schema.tables"].ENGINE.isin(['InnoDB'])].where(tables['TABLE_TYPE'] == 'BASE TABLE' )[['TABLE_SCHEMA','TABLE_NAME','ENGINE']].dropna().values #相当于sql: select TABLE_SCHEMA,TABLE_NAME,ENGINE from information_schema.tables where ENGINE not in ('InnoDB')  #系统表在采集数据的时候就已经过滤了...
 			result["no_innodb_table"] = {"istrue":True, "data":not_innodb, "describe":"非innodb表"}
 		except Exception as e:
-			result["no_innodb_table"] = {"istrue":False, "data":e, "describe":"非innodb表"}
+			print("no_innodb_table",e)
+			result["no_innodb_table"] = {"istrue":False, "data":"", "describe":"非innodb表"}
 
 
 		#各种引擎的表
@@ -122,17 +123,19 @@ class set:
 			all_engine_table_T = all_engine_table.T
 			result["all_engine_table"] = {"istrue":True,"data":{"all_engine_table":all_engine_table.values,"all_engine_table_T":all_engine_table_T.values}}
 		except Exception as e:
-			result["all_engine_table"] = {"istrue":True,"data":e}
+			print("all_engine_table",e)
+			result["all_engine_table"] = {"istrue":True,"data":""}
 
 
 		#无主键的表
 		try:
 			cols = table_list["information_schema.columns"]
 			primary_key_unique_key_table = cols[cols.COLUMN_KEY.isin(['PRI','UNI'])][['TABLE_SCHEMA','TABLE_NAME']]
-			no_primary_key = pd.concat([tables[['TABLE_SCHEMA','TABLE_NAME']],primary_key_unique_key_table,primary_key_unique_key_table]).drop_duplicates(keep=False).values
+			no_primary_key = pd.concat([tables.where(tables['TABLE_TYPE'] == 'BASE TABLE' )[['TABLE_SCHEMA','TABLE_NAME']],primary_key_unique_key_table,primary_key_unique_key_table]).drop_duplicates(keep=False).values
 			result["no_primary_key"] = {"istrue":True, "data":no_primary_key, "describe":"无主键的表"}
 		except Exception as e:
-			result["no_primary_key"] = {"istrue":False, "data":e, "describe":"无主键的表"}
+			print("no_primary_key",e)
+			result["no_primary_key"] = {"istrue":False, "data":"", "describe":"无主键的表"}
 
 
 		#重复索引的表
@@ -142,7 +145,8 @@ class set:
 			repeat_index=re_index[['TABLE_SCHEMA','TABLE_NAME','INDEX_NAME','COLUMN_NAME']].sort_values(by=['TABLE_SCHEMA','TABLE_NAME','COLUMN_NAME'],ascending=False).values
 			result["repeat_index"] = {"istrue":True, "data":repeat_index, "describe":"有重复索引的表"}
 		except Exception as e:
-			result["repeat_index"] = {"istrue":False, "data":e, "describe":"有重复索引的表"}
+			print("repeat_index",e)
+			result["repeat_index"] = {"istrue":False, "data":"", "describe":"有重复索引的表"}
 			
 
 
@@ -152,7 +156,8 @@ class set:
 			no_index = pd.concat([tables[['TABLE_SCHEMA','TABLE_NAME']],have_index_table,have_index_table]).drop_duplicates(keep=False).values
 			result["no_index"] = {"istrue":True, "data":no_index, "describe":"没得索引的表"}
 		except Exception as e:
-			result["no_index"] = {"istrue":False, "data":e, "describe":"没得索引的表"}
+			print("no_index",e)
+			result["no_index"] = {"istrue":False, "data":"", "describe":"没得索引的表"}
 
 
 		#索引数量超过5的表
@@ -164,7 +169,8 @@ class set:
 			over_5_index = over_5_index.where(over_5_index["INDEX_NAME"]>5).dropna().values
 			result["over_5_index"] = {"istrue":True, "data":over_5_index, "describe":"索引数量超过5的表"}
 		except Exception as e:
-			result["over_5_index"] = {"istrue":False, "data":e, "describe":"索引数量超过5的表"}
+			print("over_5_index",e)
+			result["over_5_index"] = {"istrue":False, "data":"", "describe":"索引数量超过5的表"}
 			
 		
 
@@ -175,7 +181,8 @@ class set:
 			databases_T = databases_0.T.values
 			result["databases"] = {"istrue":True, "data":{"databases":databases, "databases_T":databases_T}, "describe":"数据库信息, 含数据库数据大小,索引大小,表数量"}
 		except Exception as e:
-			result["databases"] = {"istrue":False, "data":e, "describe":"数据库信息, 含数据库数据大小,索引大小,表数量"}
+			print("databases",e)
+			result["databases"] = {"istrue":False, "data":"", "describe":"数据库信息, 含数据库数据大小,索引大小,表数量"}
 			
 
 		
@@ -186,23 +193,26 @@ class set:
 
 			result["over30days_table_static"] = {"istrue":True,"data":over30days_table_static.values}
 		except Exception as e:
-			result["over30days_table_static"] = {"istrue":False,"data":e}
+			print("over30days_table_static",e)
+			result["over30days_table_static"] = {"istrue":False,"data":""}
 
 		try:
 			innodb_index_stats = table_list["mysql.innodb_index_stats"]
 			over30days_index_static = innodb_index_stats.where(innodb_index_stats['last_update'] < str(datetime.datetime.now() - datetime.timedelta(days=30)), ).dropna().drop_duplicates(keep=False)
 			result["over30days_index_static"] = {"istrue":True,"data":over30days_index_static.values}
 		except Exception as e:
-			result["over30days_index_static"] = {"istrue":False,"data":e}
+			print("over30days_index_static",e)
+			result["over30days_index_static"] = {"istrue":False,"data":""}
 			
 
 		#碎片率超过30%的表 (去掉小表, data_free < 40MB的)
 		try:
 			tables["fragment_rate"] = round(tables["DATA_FREE"]/(tables["DATA_FREE"]+tables["DATA_LENGTH"]),2)
-			fragment_table = tables.where(tables["fragment_rate"]>0.3 & tables["DATA_FREE"] > 41943040)[['TABLE_SCHEMA','TABLE_NAME','DATA_FREE','fragment_rate']].dropna().values
+			fragment_table = tables.where((tables["fragment_rate"]>0.3) & (tables["DATA_FREE"] > 41943040))[['TABLE_SCHEMA','TABLE_NAME','DATA_FREE','fragment_rate']].dropna().values
 			result["fragment_table"] = {"istrue":True,"data":fragment_table}
 		except Exception as e:
-			result["fragment_table"] = {"istrue":False,"data":e}
+			print("fragment_table",e)
+			result["fragment_table"] = {"istrue":False,"data":""}
 
 
 		#大表  大于1000W行 且大于30GB
@@ -210,7 +220,8 @@ class set:
 			big_table = tables.where((tables["TABLE_ROWS"]>10000000) & (tables["DATA_LENGTH"] > 32212254720) )[['TABLE_SCHEMA','TABLE_NAME','TABLE_ROWS','DATA_LENGTH']].dropna().values
 			result["big_table"] = {"istrue":True,"data":big_table}
 		except Exception as e:
-			result["big_table"] = {"istrue":False,"data":e}
+			print("big_table",e)
+			result["big_table"] = {"istrue":False,"data":""}
 			
 			
 		#冷表
@@ -219,7 +230,7 @@ class set:
 			result["cold_table"] = {"istrue":True,"data":cold_table}
 		except Exception as e:
 			print("cold_table",e)
-			result["cold_table"] = {"istrue":False,"data":e}
+			result["cold_table"] = {"istrue":False,"data":""}
 
 
 
@@ -243,13 +254,13 @@ class set:
 			result["BUFFER POOL AND MEMORY"] = {"istrue":True,"data":total_buffer_pool_and_memory}
 		except Exception as e:
 			print(e,"BUFFER POOL AND MEMORY")
-			result["BUFFER POOL AND MEMORY"] = {"istrue":False,"data":e}
+			result["BUFFER POOL AND MEMORY"] = {"istrue":False,"data":""}
 
 		try:
 			result["TRANSACTIONS"] = {"istrue":True,"data":engine_innodb_status_detail.split("------------\nTRANSACTIONS\n------------")[1].split("--------\nFILE I/O\n--------")[0]}
 		except Exception as e:
 			print(e,"TRANSACTIONS")
-			result["TRANSACTIONS"] = {"istrue":True,"data":e}
+			result["TRANSACTIONS"] = {"istrue":True,"data":""}
 
 			
 
@@ -277,7 +288,8 @@ class set:
 			sql_comm_T = Com_df.T.values
 			result["sql_comm"] = {"istrue":True,"data":{"sql_comm":sql_comm,"sql_comm_T":sql_comm_T},"describe":"sql执行情况"}
 		except Exception as e:
-			result["sql_comm"] = {"istrue":False,"data":e,"describe":"sql执行情况"}
+			print("sql_comm",e)
+			result["sql_comm"] = {"istrue":False,"data":"","describe":"sql执行情况"}
 
 
 
@@ -323,7 +335,8 @@ class set:
 			top20_sql = events_statements_summary_by_digest[["SCHEMA_NAME","COUNT_STAR","FIRST_SEEN","LAST_SEEN","SUM_ROWS_AFFECTED","DIGEST_TEXT"]].sort_values(by=['COUNT_STAR'],ascending=False).head(20)
 			result["top20_sql"] = {"istrue":True,"data":top20_sql.values}
 		except Exception as e:
-			result["top20_sql"] = {"istrue":False,"data":e}
+			print("top20_sql",e)
+			result["top20_sql"] = {"istrue":False,"data":""}
 
 
 		#数据库状态分析 show status
@@ -333,7 +346,7 @@ class set:
 			result["status"] = {"istrue":True,"data":status.to_dict()}
 		except Exception as e:
 			print(e,"status")
-			result["status"] = {"istrue":False,"data":e}
+			result["status"] = {"istrue":False,"data":""}
 			
 			
 		#基础汇总信息
@@ -439,22 +452,25 @@ class set:
 			processlist = table_list["information_schema.processlist"]
 			result["processlist"] = {"istrue":True,"data":processlist.values}
 		except Exception as e:
-			result["processlist"] = {"istrue":False,"data":e}
+			print("processlist",e)
+			result["processlist"] = {"istrue":False,"data":""}
 
 		#threads
 		try:
 			threads = table_list["performance_schema.threads"]
 			result["threads"] = {"istrue":True,"data":threads.values}
 		except Exception as e:
-			result["threads"] = {"istrue":False,"data":e}
+			print("threads",e)
+			result["threads"] = {"istrue":False,"data":""}
 		
 		
 
 		#集群高可用信息
 		try:
-			slave_status = table_comm_list["slave_status"][0]
-			slave_host = slave_status[1]
-			slave_port = slave_status[3]
+			slave_status = table_comm_list["slave_status"]
+			#print(slave_status,len(slave_status[0]))
+			#slave_host = slave_status[1]
+			#slave_port = slave_status[3]
 			result["slave_status"] = {"istrue":True,"data":slave_status}
 		except Exception as e:
 			print("no slave status")
@@ -492,8 +508,11 @@ class set:
 			
 			if current_role is None:
 				current_role = ""
-				if result["slave_status"]["istrue"]:
-					current_role += " 从库 "
+				try:
+					if result["slave_status"]["istrue"] and len(result["slave_status"]["data"]) > 0:
+						current_role += " 从库 "
+				except:
+					pass
 				if processlist.where(processlist['COMMAND']=="Binlog Dump")[["HOST"]].dropna().values.shape[0] > 0:
 					current_role += " 主库(有{n}个从库) ".format(n=processlist.where(processlist['COMMAND']=="Binlog Dump")[["HOST"]].dropna().values.shape[0])
 			if current_role == "":
@@ -529,7 +548,8 @@ class set:
 				binlog_stat_df_group_by_T = binlog_stat_df_group_by.T
 				result["binlog_grows"] = {"istrue":True,"data":{"binlog_stat_df_group_by_T":binlog_stat_df_group_by_T.values,"binlog_stat_df_group_by":binlog_stat_df_group_by.values},}
 			except Exception as e:
-				result["binlog_grows"] = {"istrue":False,"data":e}
+				print("binlog_grows",e)
+				result["binlog_grows"] = {"istrue":False,"data":""}
 
 			#慢sql分析
 			try:
@@ -571,8 +591,8 @@ class set:
 					#TODO PY ANALYZE SLOW LOG
 					result["slow_sql"] = {"istrue":False,"data":""}
 			except Exception as e:
-					print("no slow sql")
-					result["slow_sql"] = {"istrue":False,"data":e}
+					print("no slow sql",e)
+					result["slow_sql"] = {"istrue":False,"data":""}
 
 
 			#错误日志分析
@@ -601,7 +621,8 @@ class set:
 				else:
 					result["error_log"] = {"istrue":False,"data":""}
 			except Exception as e:
-				result["error_log"] = {"istrue":False,"data":e}
+				print("error_log",e)
+				result["error_log"] = {"istrue":False,"data":""}
 
 
 
@@ -623,7 +644,7 @@ class set:
 				result["log_bin_index"] = {"istrue":False,"data":""}
 
 
-			#CPU使用率
+			#CPU使用率等
 			try:
 				uptime = hostdata["uptime"]["stdout"]
 				cpu_socket = hostdata["cpu_socket"]["stdout"]
@@ -637,11 +658,23 @@ class set:
 				swappiness = hostdata["swappiness"]["stdout"]
 				hostname = hostdata["hostname"]["stdout"]
 				platform = hostdata["platform"]["stdout"]
+
+				#cpu使用率计算  uptime或者cpu数量 有为0的情况(虽然不可能, 但是确实有这个异常..), 所以这这计算使用率
+				try:
+					uptime_0 = uptime.split()[0]
+					uptime_1 = uptime.split()[1]
+					cpu_use = float(uptime_1)/(float(uptime_0)*float(cpu_socket)*float(cpu_core)*float(cpu_thread))
+					cpu_p = round( (1 - cpu_use)*100 ,2)
+					cpu_p = str(cpu_p) + '%'
+				except Exception as e:
+					print(e,' uptime: ',uptime.split()[0], uptime.split()[1], ' cpu: ',cpu_socket,cpu_core,cpu_thread)
+					cpu_p = ''
+
 				mem = {}
 				for x in meminfo.split("\n"):
 					mem_kv = x.split(":")
 					mem[mem_kv[0]] = int(mem_kv[1].strip().split()[0])
-				result["cpu_mem"] = {"istrue":True,"cpu_socket":cpu_socket,"cpu_core":cpu_core,"cpu_thread":cpu_thread,"timezone":timezone,"mem":mem,"uptime":uptime.split(),"osname":osname, "kernel":kernel, "loadavg":loadavg.split(), "swappiness":swappiness,"hostname":hostname,"platform":platform}
+				result["cpu_mem"] = {"istrue":True,"cpu_socket":cpu_socket,"cpu_core":cpu_core,"cpu_thread":cpu_thread,"timezone":timezone,"mem":mem,"uptime":uptime.split(),"osname":osname, "kernel":kernel, "loadavg":loadavg.split(), "swappiness":swappiness,"hostname":hostname,"platform":platform,'cpu_p':cpu_p}
 			except Exception as e:
 				result["cpu_mem"] = {"istrue":False}
 				print(e,"cpu_mem")

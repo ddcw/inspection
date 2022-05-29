@@ -63,7 +63,6 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 			<li><a href="#variables">重要参数</a></li>
 			<li><a href="#no_primary_key">无主键的表</a></li>
 			<li><a href="#no_innodb_table">非InnoDB表</a></li>
-			<li><a href="#no_innodb_table">非InnoDB表</a></li>
 			<li><a href="#repeat_index">重复索引的表</a></li>
 			<li><a href="#over_5_index">索引过多的表</a></li>
 			<li><a href="#sql_comm">SQL执行占比</a></li>
@@ -83,7 +82,7 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 			<li><a href="#memory_by_user_by_current_bytes">使用内存最多的用户 (TOP20)</a></li>
 			<li><a href="#tmp_table_file">使用临时表的SQL</a></li>
 			<li><a href="#slow_sql">慢SQL (TOP20)</a></li>
-			<li><a href="#error_log">错误日志</a></li>
+			<li><a href="#error_log">错误日志 (LATEST 20)</a></li>
 			{% if data["current_role"]["istrue"] %}<li><a href="#cluster_slave">主从/集群信息</a></li>{%endif%}
 		</ul>
 	</div>
@@ -127,10 +126,10 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 	<tr>
 		<td>{{ ((data["status"]["data"]["value"]["Com_commit"]|int+data["status"]["data"]["value"]["Com_rollback"]|int)/data["status"]["data"]["value"]["Uptime"]|int) | round(2) }}</td>
 		<td>{{(data["status"]["data"]["value"]["Questions"]|int/data["status"]["data"]["value"]["Uptime"]|int) | round(2)}}</td>
-		<td>{{data["processlist"]["data"]|count}}</td>
-		<td>{{data["threads"]["data"]|count}}</td>
-		<td>{{data["sql_comm"]["data"]["sql_comm"]|count}}</td>
-		<td>{{data["plugins"]["data"]|count}}</td>
+		{%if data["processlist"]["istrue"]%}<td>{{data["processlist"]["data"]|count}}</td>{%else%}<td>无</td>{%endif%}
+		{%if data["threads"]["istrue"]%}<td>{{data["threads"]["data"]|count}}</td>{%else%}<td>无</td>{%endif%}
+		{%if data["sql_comm"]["istrue"]%}<td>{{data["sql_comm"]["data"]["sql_comm"]|count}}</td>{%else%}<td>无</td>{%endif%}
+		{%if data["plugins"]["istrue"]%}<td>{{data["plugins"]["data"]|count}}</td>{%else%}<td>无</td>{%endif%}
 	</tr>
 </table>
 
@@ -298,7 +297,7 @@ console.log("最新下载地址:  https://github.com/ddcw/inspection")
 		<th class="awrbg" scope="col">时区</th>
 	</tr>
 	<tr>
-		<td>{{ ((1 - data["cpu_mem"]["uptime"][1]|int/(data["cpu_mem"]["uptime"][0]|int*data["cpu_mem"]["cpu_socket"]|int*data["cpu_mem"]["cpu_core"]|int*data["cpu_mem"]["cpu_thread"]|int))*100)|round(2) }}% </td>
+		<td>{{data["cpu_mem"]["cpu_p"]}}</td>
 		<td> {{ ((1-data["cpu_mem"]["mem"]["MemAvailable"]|int/data["cpu_mem"]["mem"]["MemTotal"]|int)*100)|round(2) }}%</td>
 		<td>{%if data["cpu_mem"]["mem"]["SwapTotal"]|int>0 %} {{ ((1-data["cpu_mem"]["mem"]["SwapFree"]|int/data["cpu_mem"]["mem"]["SwapTotal"]|int)*100)|round(2) }}%{%else%}无SWAP{%endif%}</td>
 		<td>{{data["cpu_mem"]["osname"]}}</td>
@@ -1264,7 +1263,7 @@ myChart_binlog_grows.canvas.parentNode.style.width = '100vh';
 </table>
 
 <!-- 错误日志 -->
-<h3 class="awr" id="error_log"><a class="awr"></a>错误日志</h3>
+<h3 class="awr" id="error_log"><a class="awr"></a>错误日志 </h3>
 <table border="0" width="70%" class="tdiff">
 	<tr>
 		<th class="awrbg" scope="col">Time</th>
@@ -1287,20 +1286,138 @@ myChart_binlog_grows.canvas.parentNode.style.width = '100vh';
 <h3 class="awr" id="cluster_slave"><a class="awr"></a>集群/主从信息</h3>
 {% if data["slave_status"]["istrue"] and (data["slave_status"]["data"]|count)>0 %}
 <table border="0" width="70%" class="tdiff">
+{%for db in data["slave_status"]["data"]%}
+{% if db|length == 57 %}
 	<tr>
-		<th class="awrbg" scope="col">主库地址</th>
-		<th class="awrbg" scope="col">主库端口</th>
-		<th class="awrbg" scope="col">Slave_IO_Running</th>
-		<th class="awrbg" scope="col">Slave_SQL_Running</th>
-		<th class="awrbg" scope="col">Master_Bind(延迟)</th>
+		<th class="awrbg" scope="col">参数</th>
+		<th class="awrbg" scope="col">值</th>
 	</tr>
+<tr><td style="text-align:right">Slave_IO_State :  </td><td style="text-align:left">{{db[0]}}</td></tr>
+<tr><td style="text-align:right">Master_Host :  </td><td style="text-align:left">{{db[1]}}</td></tr>
+<tr><td style="text-align:right">Master_User :  </td><td style="text-align:left">{{db[2]}}</td></tr>
+<tr><td style="text-align:right">Master_Port :  </td><td style="text-align:left">{{db[3]}}</td></tr>
+<tr><td style="text-align:right">Connect_Retry :  </td><td style="text-align:left">{{db[4]}}</td></tr>
+<tr><td style="text-align:right">Master_Log_File :  </td><td style="text-align:left">{{db[5]}}</td></tr>
+<tr><td style="text-align:right">Read_Master_Log_Pos :  </td><td style="text-align:left">{{db[6]}}</td></tr>
+<tr><td style="text-align:right">Relay_Log_File :  </td><td style="text-align:left">{{db[7]}}</td></tr>
+<tr><td style="text-align:right">Relay_Log_Pos :  </td><td style="text-align:left">{{db[8]}}</td></tr>
+<tr><td style="text-align:right">Relay_Master_Log_File :  </td><td style="text-align:left">{{db[9]}}</td></tr>
+<tr><td style="text-align:right">Slave_IO_Running :  </td><td style="text-align:left;{%if db[10] != "Yes" %}background-color:red{%endif%}">{{db[10]}}</td></tr>
+<tr><td style="text-align:right">Slave_SQL_Running :  </td><td style="text-align:left;{%if db[11] != "Yes" %}background-color:red{%endif%}">{{db[11]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Do_DB :  </td><td style="text-align:left">{{db[12]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Ignore_DB :  </td><td style="text-align:left">{{db[13]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Do_Table :  </td><td style="text-align:left">{{db[14]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Ignore_Table :  </td><td style="text-align:left">{{db[15]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Wild_Do_Table :  </td><td style="text-align:left">{{db[16]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Wild_Ignore_Table :  </td><td style="text-align:left">{{db[17]}}</td></tr>
+<tr><td style="text-align:right">Last_Errno :  </td><td style="text-align:left">{{db[18]}}</td></tr>
+<tr><td style="text-align:right">Last_Error :  </td><td style="text-align:left">{{db[19]}}</td></tr>
+<tr><td style="text-align:right">Skip_Counter :  </td><td style="text-align:left">{{db[20]}}</td></tr>
+<tr><td style="text-align:right">Exec_Master_Log_Pos :  </td><td style="text-align:left">{{db[21]}}</td></tr>
+<tr><td style="text-align:right">Relay_Log_Space :  </td><td style="text-align:left">{{db[22]}}</td></tr>
+<tr><td style="text-align:right">Until_Condition :  </td><td style="text-align:left">{{db[23]}}</td></tr>
+<tr><td style="text-align:right">Until_Log_File :  </td><td style="text-align:left">{{db[24]}}</td></tr>
+<tr><td style="text-align:right">Until_Log_Pos :  </td><td style="text-align:left">{{db[25]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Allowed :  </td><td style="text-align:left">{{db[26]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_CA_File :  </td><td style="text-align:left">{{db[27]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_CA_Path :  </td><td style="text-align:left">{{db[28]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Cert :  </td><td style="text-align:left">{{db[29]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Cipher :  </td><td style="text-align:left">{{db[30]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Key :  </td><td style="text-align:left">{{db[31]}}</td></tr>
+<tr><td style="text-align:right">Seconds_Behind_Master :  </td><td style="text-align:left;{%if db[32]|int >3600%}background-color:red{%elif db[32]|int > 1200 %}background-color:yellow{%endif%}">{{db[32]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Verify_Server_Cert :  </td><td style="text-align:left">{{db[33]}}</td></tr>
+<tr><td style="text-align:right">Last_IO_Errno :  </td><td style="text-align:left">{{db[34]}}</td></tr>
+<tr><td style="text-align:right">Last_IO_Error :  </td><td style="text-align:left">{{db[35]}}</td></tr>
+<tr><td style="text-align:right">Last_SQL_Errno :  </td><td style="text-align:left">{{db[36]}}</td></tr>
+<tr><td style="text-align:right">Last_SQL_Error :  </td><td style="text-align:left">{{db[37]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Ignore_Server_Ids :  </td><td style="text-align:left">{{db[38]}}</td></tr>
+<tr><td style="text-align:right">Master_Server_Id :  </td><td style="text-align:left">{{db[39]}}</td></tr>
+<tr><td style="text-align:right">Master_UUID :  </td><td style="text-align:left">{{db[40]}}</td></tr>
+<tr><td style="text-align:right">Master_Info_File :  </td><td style="text-align:left">{{db[41]}}</td></tr>
+<tr><td style="text-align:right">SQL_Delay :  </td><td style="text-align:left">{{db[42]}}</td></tr>
+<tr><td style="text-align:right">SQL_Remaining_Delay :  </td><td style="text-align:left">{{db[43]}}</td></tr>
+<tr><td style="text-align:right">Slave_SQL_Running_State :  </td><td style="text-align:left">{{db[44]}}</td></tr>
+<tr><td style="text-align:right">Master_Retry_Count :  </td><td style="text-align:left">{{db[45]}}</td></tr>
+<tr><td style="text-align:right">Master_Bind :  </td><td style="text-align:left">{{db[46]}}</td></tr>
+<tr><td style="text-align:right">Last_IO_Error_Timestamp :  </td><td style="text-align:left">{{db[47]}}</td></tr>
+<tr><td style="text-align:right">Last_SQL_Error_Timestamp :  </td><td style="text-align:left">{{db[48]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Crl :  </td><td style="text-align:left">{{db[49]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Crlpath :  </td><td style="text-align:left">{{db[50]}}</td></tr>
+<tr><td style="text-align:right">Retrieved_Gtid_Set :  </td><td style="text-align:left">{{db[51]}}</td></tr>
+<tr><td style="text-align:right">Executed_Gtid_Set :  </td><td style="text-align:left">{{db[52]}}</td></tr>
+<tr><td style="text-align:right">Auto_Position :  </td><td style="text-align:left">{{db[53]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Rewrite_DB :  </td><td style="text-align:left">{{db[54]}}</td></tr>
+<tr><td style="text-align:right">Channel_Name :  </td><td style="text-align:left">{{db[55]}}</td></tr>
+<tr><td style="text-align:right">Master_TLS_Version :  </td><td style="text-align:left">{{db[56]}}</td></tr>
+{% elif db|length == 60 %}
 	<tr>
-		<td>{{data["slave_status"]["data"][1]}}</td>
-		<td>{{data["slave_status"]["data"][3]}}</td>
-		<td {% if data["slave_status"]["data"][10] != "Yes" %}style="background:red"{%endif%} >{{data["slave_status"]["data"][10]}}</td>
-		<td {% if data["slave_status"]["data"][11] != "Yes" %}style="background:red"{%endif%} >{{data["slave_status"]["data"][11]}}</td>
-		<td {% if data["slave_status"]["data"][46]|int > 300 %}style="background:yellow" {%endif%}>{{data["slave_status"]["data"][46]}}</td>
+		<th class="awrbg" scope="col">参数(8.0)</th>
+		<th class="awrbg" scope="col">值</th>
 	</tr>
+<tr><td style="text-align:right">Slave_IO_State :  </td><td style="text-align:left">{{db[0]}}</td></tr>
+<tr><td style="text-align:right">Master_Host :  </td><td style="text-align:left">{{db[1]}}</td></tr>
+<tr><td style="text-align:right">Master_User :  </td><td style="text-align:left">{{db[2]}}</td></tr>
+<tr><td style="text-align:right">Master_Port :  </td><td style="text-align:left">{{db[3]}}</td></tr>
+<tr><td style="text-align:right">Connect_Retry :  </td><td style="text-align:left">{{db[4]}}</td></tr>
+<tr><td style="text-align:right">Master_Log_File :  </td><td style="text-align:left">{{db[5]}}</td></tr>
+<tr><td style="text-align:right">Read_Master_Log_Pos :  </td><td style="text-align:left">{{db[6]}}</td></tr>
+<tr><td style="text-align:right">Relay_Log_File :  </td><td style="text-align:left">{{db[7]}}</td></tr>
+<tr><td style="text-align:right">Relay_Log_Pos :  </td><td style="text-align:left">{{db[8]}}</td></tr>
+<tr><td style="text-align:right">Relay_Master_Log_File :  </td><td style="text-align:left">{{db[9]}}</td></tr>
+<tr><td style="text-align:right">Slave_IO_Running :  </td><td style="text-align:left;{%if db[10] != "Yes" %}background-color:red{%endif%}">{{db[10]}}</td></tr>
+<tr><td style="text-align:right">Slave_SQL_Running :  </td><td style="text-align:left;{%if db[11] != "Yes" %}background-color:red{%endif%}">{{db[11]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Do_DB :  </td><td style="text-align:left">{{db[12]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Ignore_DB :  </td><td style="text-align:left">{{db[13]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Do_Table :  </td><td style="text-align:left">{{db[14]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Ignore_Table :  </td><td style="text-align:left">{{db[15]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Wild_Do_Table :  </td><td style="text-align:left">{{db[16]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Wild_Ignore_Table :  </td><td style="text-align:left">{{db[17]}}</td></tr>
+<tr><td style="text-align:right">Last_Errno :  </td><td style="text-align:left">{{db[18]}}</td></tr>
+<tr><td style="text-align:right">Last_Error :  </td><td style="text-align:left">{{db[19]}}</td></tr>
+<tr><td style="text-align:right">Skip_Counter :  </td><td style="text-align:left">{{db[20]}}</td></tr>
+<tr><td style="text-align:right">Exec_Master_Log_Pos :  </td><td style="text-align:left">{{db[21]}}</td></tr>
+<tr><td style="text-align:right">Relay_Log_Space :  </td><td style="text-align:left">{{db[22]}}</td></tr>
+<tr><td style="text-align:right">Until_Condition :  </td><td style="text-align:left">{{db[23]}}</td></tr>
+<tr><td style="text-align:right">Until_Log_File :  </td><td style="text-align:left">{{db[24]}}</td></tr>
+<tr><td style="text-align:right">Until_Log_Pos :  </td><td style="text-align:left">{{db[25]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Allowed :  </td><td style="text-align:left">{{db[26]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_CA_File :  </td><td style="text-align:left">{{db[27]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_CA_Path :  </td><td style="text-align:left">{{db[28]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Cert :  </td><td style="text-align:left">{{db[29]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Cipher :  </td><td style="text-align:left">{{db[30]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Key :  </td><td style="text-align:left">{{db[31]}}</td></tr>
+<tr><td style="text-align:right">Seconds_Behind_Master :  </td><td style="text-align:left;{%if db[32]|int >3600%}background-color:red{%elif db[32]|int > 1200 %}background-color:yellow{%endif%}">{{db[32]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Verify_Server_Cert :  </td><td style="text-align:left">{{db[33]}}</td></tr>
+<tr><td style="text-align:right">Last_IO_Errno :  </td><td style="text-align:left">{{db[34]}}</td></tr>
+<tr><td style="text-align:right">Last_IO_Error :  </td><td style="text-align:left">{{db[35]}}</td></tr>
+<tr><td style="text-align:right">Last_SQL_Errno :  </td><td style="text-align:left">{{db[36]}}</td></tr>
+<tr><td style="text-align:right">Last_SQL_Error :  </td><td style="text-align:left">{{db[37]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Ignore_Server_Ids :  </td><td style="text-align:left">{{db[38]}}</td></tr>
+<tr><td style="text-align:right">Master_Server_Id :  </td><td style="text-align:left">{{db[39]}}</td></tr>
+<tr><td style="text-align:right">Master_UUID :  </td><td style="text-align:left">{{db[40]}}</td></tr>
+<tr><td style="text-align:right">Master_Info_File :  </td><td style="text-align:left">{{db[41]}}</td></tr>
+<tr><td style="text-align:right">SQL_Delay :  </td><td style="text-align:left">{{db[42]}}</td></tr>
+<tr><td style="text-align:right">SQL_Remaining_Delay :  </td><td style="text-align:left">{{db[43]}}</td></tr>
+<tr><td style="text-align:right">Slave_SQL_Running_State :  </td><td style="text-align:left">{{db[44]}}</td></tr>
+<tr><td style="text-align:right">Master_Retry_Count :  </td><td style="text-align:left">{{db[45]}}</td></tr>
+<tr><td style="text-align:right">Master_Bind :  </td><td style="text-align:left">{{db[46]}}</td></tr>
+<tr><td style="text-align:right">Last_IO_Error_Timestamp :  </td><td style="text-align:left">{{db[47]}}</td></tr>
+<tr><td style="text-align:right">Last_SQL_Error_Timestamp :  </td><td style="text-align:left">{{db[48]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Crl :  </td><td style="text-align:left">{{db[49]}}</td></tr>
+<tr><td style="text-align:right">Master_SSL_Crlpath :  </td><td style="text-align:left">{{db[50]}}</td></tr>
+<tr><td style="text-align:right">Retrieved_Gtid_Set :  </td><td style="text-align:left">{{db[51]}}</td></tr>
+<tr><td style="text-align:right">Executed_Gtid_Set :  </td><td style="text-align:left">{{db[52]}}</td></tr>
+<tr><td style="text-align:right">b68e2434-cd30-11ec-b536-000c2980c11e :  </td><td style="text-align:left">{{db[53]}}</td></tr>
+<tr><td style="text-align:right">Auto_Position :  </td><td style="text-align:left">{{db[54]}}</td></tr>
+<tr><td style="text-align:right">Replicate_Rewrite_DB :  </td><td style="text-align:left">{{db[55]}}</td></tr>
+<tr><td style="text-align:right">Channel_Name :  </td><td style="text-align:left">{{db[56]}}</td></tr>
+<tr><td style="text-align:right">Master_TLS_Version :  </td><td style="text-align:left">{{db[57]}}</td></tr>
+<tr><td style="text-align:right">Master_public_key_path :  </td><td style="text-align:left">{{db[58]}}</td></tr>
+<tr><td style="text-align:right">Get_master_public_key :  </td><td style="text-align:left">{{db[59]}}</td></tr>
+<tr><td style="text-align:right">Network_Namespace :  </td><td style="text-align:left">{{db[60]}}</td></tr>
+{%endif%}
+{%endfor%}
+
 </table>
 {%endif%}
 

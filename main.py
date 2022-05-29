@@ -494,16 +494,6 @@ setTimeout("returnIndex()",3000)
 		app.run(host=self.host,  port=self.port, debug=False, )
 
 
-	#ins1 = inspection(
-	#	port=3332,
-	#	user="root",
-	#	password="123456",
-	#	ssh_password="Ddcw@123."
-	#)
-
-	#print(ins1.test())
-	#ins1.connect()
-	#ins1.run()
 
 
 #定义参数
@@ -552,7 +542,8 @@ if __name__ == '__main__':
 
 	
 	if parser.version:
-		print("Version: 1.0")
+		print("Version: 1.1")
+		sys.exit(0)
 
 	if parser.MF:
 		try:

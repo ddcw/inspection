@@ -171,7 +171,7 @@ def return_index():
 			}
 			else if (this.status != 200) {
 				document.getElementById("ksxj").value="开始巡检";document.getElementById("ksxj").style.backgroundColor="#FF0000";
-				alert("巡检脚本所在的服务器网络有问题.... 或者服务未启动, 或者端口不对.")
+				alert("巡检脚本所在的服务器网络有问题.... 或者服务未启动, 或者端口不对(或者服务器内部问题, 请登录服务器查看).")
 			}
 		}
 		xhr.send(formdata)

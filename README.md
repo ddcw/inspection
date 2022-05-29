@@ -147,7 +147,7 @@ data["HOSTINFO"] #主机信息
 | 重复索引       | 表    |                                          | indx_1(id,name)  indx_2(id,age)  这种id也算重复索引 |
 | 索引数量过多的表   | 表    | 索引数量超过5(不含)的表                            |                                          |
 | SQL执行情况    | 表+图  | status种  Com_开头的统计                       |                                          |
-| 统计信息过期的表   | 表    | 最近更新统计信息事件超过30天                          |                                          |
+| 统计信息过期的表   | 表    | 最近更新统计信息时间超过30天                          |                                          |
 | 碎片率超过30%的表 | 表    | data_free/(data_length+data_free)>0.3    | 排除小表(data_free<40MB)                     |
 | binlog信息变化 | 图    | binlog的切换频率和每天的大小变化                      | 数据来自操作系统, 参考命令 stat binlog00003          |
 | 最大的表       | 表    | TOP20 表排序                                |                                          |
@@ -163,7 +163,7 @@ data["HOSTINFO"] #主机信息
 | 使用内存最多的用户  | 表    | memory_by_user_by_current_bytes          |                                          |
 | 使用临时表的SQL  | 表    | events_statements_summary_by_digest      | 含临时文件                                    |
 | 慢SQL       | 表    | 执行时间最长的前20条慢SQL                          | 本条是使用pt-query-digest分析的, 根据Query_time_median排序 |
-| 错误日志       | 表    | error.log                                |                                          |
+| 错误日志       | 表    | error.log  中含ERROR的最新20条                 |                                          |
 | 集群/主从信息    | 表    | show slave status replication_group_members replication_group_member_stats |                                          |
 |            |      |                                          |                                          |
 
@@ -189,11 +189,37 @@ data["HOSTINFO"] #主机信息
 
 # BUG修复
 
+2022.05.17
 
+修复 jinja2 计算cpu使用率 为0 的异常
+
+
+
+2022.05.16
+
+修复无主键表,非innodb表含视图问题
+
+修复碎片表Cannot perform 'rand_' with a dtyped [float64] array and scalar of type [bool]
+
+
+
+2022.05.13
+
+修复win环境乱码问题, 在特定情况下 可以在windows上使用此脚本
 
 
 
 # changelog
+
+2022.05.16  v1.1
+
+支持windows使用此脚本
+
+美化前台界面
+
+修复已知BUG
+
+
 
 
 
@@ -211,13 +237,13 @@ data["HOSTINFO"] #主机信息
 
 2022.04.11   v0.3  
 
-修复已知BUG, 其它我忘了.
+修复已知BUG
 
 
 
 2022.03.22    v0.2  
 
-可以指定模板文件, 增加右侧导航栏, 其它的我忘了....
+可以指定模板文件
 
 
 
