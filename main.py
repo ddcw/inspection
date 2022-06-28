@@ -134,9 +134,9 @@ class inspection:
 		def run1(shell, mysql, table_list,db_comm,only_json):
 			data_coll = data_collection.get_data(shell=shell, sql=mysql, table_list=table_list, db_comm=db_comm)
 			data_coll.get_mysql()
-			print("进度... 35%")
+			print("进度... 35% (已收集完数据库信息, 开始收集主机信息)")
 			data_coll.get_host() 
-			print("进度... 54%")
+			print("进度... 54% (已收集完主机信息, 开始分析)")
 			#data_coll.return_json_file("test20220419.json")
 			if only_json:
 				return data_coll.return_json_file("ddcw_{host}_{port}_{time}.json".format(host=host,port=port,time=str(time.time())))
@@ -542,7 +542,7 @@ if __name__ == '__main__':
 
 	
 	if parser.version:
-		print("Version: 1.1")
+		print("Version: 1.2")
 		sys.exit(0)
 
 	if parser.MF:

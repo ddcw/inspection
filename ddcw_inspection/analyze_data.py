@@ -515,6 +515,13 @@ class set:
 					pass
 				if processlist.where(processlist['COMMAND']=="Binlog Dump")[["HOST"]].dropna().values.shape[0] > 0:
 					current_role += " 主库(有{n}个从库) ".format(n=processlist.where(processlist['COMMAND']=="Binlog Dump")[["HOST"]].dropna().values.shape[0])
+
+			try:
+				if table_comm_list["status"]["value"]['wsrep_cluster_status'] is not None:
+					current_role = 'PXC集群'
+			except Exception as e:
+				pass
+
 			if current_role == "":
 				current_role = "非主非从" 
 			
@@ -523,7 +530,7 @@ class set:
 			print("current_role",e)
 			result["current_role"] = {"istrue":False,"data":""}
 
-
+			
 
 		#主机信息分析
 		if HAVE_HOSTINFO:

@@ -575,6 +575,10 @@ myChart.canvas.parentNode.style.width = '100vh';
 		<td style="text-align:left">group_replication_single_primary_mode</td>
 		<td>{{data["variables"]["data"]["value"]['group_replication_single_primary_mode']}}</td>
 	</tr>
+	<tr>
+		<td style="text-align:left">character_set_database</td>
+		<td>{{data["variables"]["data"]["value"]['character_set_database']}}</td>
+	</tr>
 {%endif%}
 </table>
 
@@ -1284,6 +1288,49 @@ myChart_binlog_grows.canvas.parentNode.style.width = '100vh';
 <!-- 主从信息-->
 {% if data["current_role"]["istrue"]  %}
 <h3 class="awr" id="cluster_slave"><a class="awr"></a>集群/主从信息</h3>
+{% if  data["current_role"]["data"] == "PXC集群" %}
+<table border="0" width="50%" class="tdiff">
+	<tr title='集群状态'>
+		<th class="awrbg" scope="col">cluster status</th>
+		<th class="awrbg" scope="col">value</th>
+	</tr>
+	<tr><td title='集群状态' style="text-align:left">wsrep_cluster_status</td><td {%if data["status"]["data"]["value"]["wsrep_cluster_status"] != 'Primary'%}style='background-color:red'{%endif%} >{{data["status"]["data"]["value"]["wsrep_cluster_status"]}}</td></tr>
+	<tr><td title='集群的节点数量' style="text-align:left">wsrep_cluster_size</td><td {%if data["status"]["data"]["value"]["wsrep_cluster_size"]|int < 3 %}style='background-color:yellow'{%endif%} >{{data["status"]["data"]["value"]["wsrep_cluster_size"]}}</td></tr>
+	<tr><td style="text-align:left">wsrep_cluster_state_uuid</td><td>{{data["status"]["data"]["value"]["wsrep_cluster_state_uuid"]}}</td></tr>
+</table>
+<table border="0" width="50%" class="tdiff">
+	<tr title='节点状态'>
+		<th class="awrbg" scope="col">node status</th>
+		<th class="awrbg" scope="col">value</th>
+	</tr>
+	<tr><td title='节点是否连接到集群' style="text-align:left">wsrep_connected</td><td {%if data["status"]["data"]["value"]["wsrep_connected"] != 'ON'%}style='background-color:red'{%endif%} >{{data["status"]["data"]["value"]["wsrep_connected"]}}</td></tr>
+	<tr><td title='此变量显示节点是否准备好接受查询' style="text-align:left">wsrep_ready</td><td {%if data["status"]["data"]["value"]["wsrep_ready"] != 'ON'%}style='background-color:red'{%endif%} >{{data["status"]["data"]["value"]["wsrep_ready"]}}</td></tr>
+	<tr><td title='节点状态' style="text-align:left">wsrep_local_state_comment</td><td >{{data["status"]["data"]["value"]["wsrep_local_state_comment"]}}</td></tr>
+	<tr><td style="text-align:left">wsrep_local_state_uuid</td><td >{{data["status"]["data"]["value"]["wsrep_local_state_uuid"]}}</td></tr>
+	<tr><td title='Name of the wsrep provider vendor (usually Codership Oy)' style="text-align:left">wsrep_provider_vendor</td><td >{{data["status"]["data"]["value"]["wsrep_provider_vendor"]}}</td></tr>
+	<tr><td title='Name of the wsrep provider (usually Galera)' style="text-align:left">wsrep_provider_name</td><td >{{data["status"]["data"]["value"]["wsrep_provider_name"]}}</td></tr>
+	<tr><td title='' style="text-align:left">wsrep_protocol_version</td><td >{{data["status"]["data"]["value"]["wsrep_protocol_version"]}}</td></tr>
+	<tr><td title='本节点发送到其它节点的数据量' style="text-align:left">wsrep_replicated_bytes</td><td >{{data["status"]["data"]["value"]["wsrep_replicated_bytes"]}} 字节</td></tr>
+	<tr><td title='本节点接收到的数据量' style="text-align:left">wsrep_received_bytes</td><td >{{data["status"]["data"]["value"]["wsrep_received_bytes"]}} 字节</td></tr>
+</table>
+<table border="0" width="50%" class="tdiff">
+	<tr title='pxc参数'>
+		<th class="awrbg" scope="col">variables</th>
+		<th class="awrbg" scope="col">value</th>
+	</tr>
+	<tr><td title='可选值({{data["variables"]["data"]["value"]["wsrep_sst_allowed_methods"]}})' style="text-align:left">wsrep_sst_method</td><td >{{data["variables"]["data"]["value"]["wsrep_sst_method"]}}</td></tr>
+	<tr><td style="text-align:left">wsrep_sst_allowed_methods</td><td >{{data["variables"]["data"]["value"]["wsrep_sst_allowed_methods"]}}</td></tr>
+	<tr><td style="text-align:left">wsrep_sync_wait</td><td >{{data["variables"]["data"]["value"]["wsrep_sync_wait"]}}</td></tr>
+	<tr><td style="text-align:left">wsrep_provider</td><td >{{data["variables"]["data"]["value"]["wsrep_provider"]}}</td></tr>
+	<tr><td style="text-align:left">wsrep_on</td><td >{{data["variables"]["data"]["value"]["wsrep_on"]}}</td></tr>
+	<tr><td style="text-align:left">wsrep_node_name</td><td >{{data["variables"]["data"]["value"]["wsrep_node_name"]}}</td></tr>
+	<tr><td style="text-align:left">wsrep_node_address</td><td >{{data["variables"]["data"]["value"]["wsrep_node_address"]}}</td></tr>
+	<tr><td style="text-align:left">wsrep_max_ws_size</td><td >{{data["variables"]["data"]["value"]["wsrep_max_ws_size"]}}</td></tr>
+	<tr><td style="text-align:left">wsrep_cluster_address</td><td >{{data["variables"]["data"]["value"]["wsrep_cluster_address"]}}</td></tr>
+	<tr><td style="text-align:left">wsrep_cluster_name</td><td >{{data["variables"]["data"]["value"]["wsrep_cluster_name"]}}</td></tr>
+</table>
+{%endif%}
+
 {% if data["slave_status"]["istrue"] and (data["slave_status"]["data"]|count)>0 %}
 <table border="0" width="70%" class="tdiff">
 {%for db in data["slave_status"]["data"]%}
