@@ -25,4 +25,11 @@ class set:
 					"stdout":str(f.stdout.read().rstrip(),encoding="utf-8"),
 					"stderr":str(f.stderr.read().rstrip(),encoding="utf-8"),
 					}
-			
+		
+	#是本地IP就返回True, 不是就返回False,  使用	
+	def is_local_ip(self,host):
+		localiplist = self.get_result_dict("ifconfig | grep inet  | awk '{print $2}'")['stdout']
+		if host in localiplist or host == '0.0.0.0':
+			return True
+		else:
+			return False

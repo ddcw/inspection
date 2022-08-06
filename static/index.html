@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html>
+<head lang="zh">
+	<meta charset="UTF-8">
+	<title>DDCW_INSPECTION</title>
+	<link href="static/css/bootstrap.min.css" rel="stylesheet">
+	<link href="static/css/bootstrap-table.min.css " rel="stylesheet">
+	<script src='static/js/jquery-3.3.1.min.js'></script>
+	<script src='static/js/bootstrap.bundle.min.js'></script>
+	<script src='static/js/bootstrap-table.min.js'></script>
+	<script src='static/js/bootstrap-table-zh-CN.min.js'></script>
+	<script src='static/js/jquery.knob.min.js'></script>
+<script>
+
+</script>
+<script>
+             $(function() {
+                 $(".knob").knob({
+                     max: 16,
+                     min: 1,
+                 });
+      
+             });
+         </script>
+	<style type="text/css">
+		.leftnav{
+			height: 100%;
+			width: 180px;
+			position: fixed;
+			z-index: 1;
+			top: 0;
+			left: 0;
+			background-color: #111;
+			overflow-x: hidden;
+			padding-top: 20px;
+		}
+		.leftnav button {
+			background-color: #111;
+			width: 170px;
+			border:0;
+		}
+		.leftnav a {
+			text-decoration: none;
+			font-size: 25px;
+			//color: #818181;
+			color: grey, 
+			display: block;
+		}
+
+		.leftnav a:hover {
+			color: #f1f1f1;
+		}
+		.main {
+			margin-left: 180px; 
+			padding: 0px 10px;
+		}
+		@media screen and (max-height: 450px) {
+			.sidenav {padding-top: 15px;}
+			.sidenav a {font-size: 18px;}
+		}
+		tbody tr:hover   {background-color: yellow;}
+	</style>
+	<script>
+	function get_json_len(jsdata){
+		var jssize = 0;
+		for (var i in jsdata){
+			jssize += 1;
+		}
+		return jssize;
+	}
+
+	
+	function copy_this(instance){
+		newinstance = $(instance).parent().parent().clone()
+		$(instance).parent().parent().after(newinstance)
+	}
+
+	function delete_this(instance){
+		$(instance).parent().parent().remove()
+	}
+
+
+	function inspection(){
+		parallel = parseInt(document.getElementById("parallel").value)
+		host = document.getElementsByName("host")
+		port = document.getElementsByName("port")
+		user = document.getElementsByName("user")
+		password = document.getElementsByName("password")
+		ssh_port = document.getElementsByName("ssh_port")
+		ssh_user = document.getElementsByName("ssh_user")
+		ssh_password = document.getElementsByName("ssh_password")
+
+		var data = new Array();
+		for (var i=0; i<host.length; i++){
+			instance = {
+					'host':host[i].value,
+					'port':parseInt(port[i].value),
+					'user':user[i].value,
+					'password':password[i].value,
+					'ssh_port':parseInt(ssh_port[i].value),
+					'ssh_user':ssh_user[i].value,
+					'ssh_password':ssh_password[i].value,
+			}
+			data[i] = instance
+			//alert(host[i].value)
+		}
+
+		//alert(JSON.stringify(data))
+		document.getElementById('begin_xunjian_button').value='正在巡检'
+		document.getElementById('begin_xunjian_button').className = 'btn btn-info'
+
+		urls = location.protocol + "//" + location.hostname + ":" + location.port + "/inspection_web"
+		formdata = new FormData();
+		formdata.append("parallel",parallel);
+		formdata.append("data",data);
+		let xhr = new XMLHttpRequest();
+		xhr.open('POST', urls, true);
+		xhr.setRequestHeader("Content-Type", "application/json")
+		xhr.onreadystatechange = function () {
+			if (this.readyState == 4 && this.status == 200) {
+				rsp_text = xhr.responseText
+				//alert(rsp_text)
+				document.getElementById('begin_xunjian_button').value='开始巡检'
+				document.getElementById('begin_xunjian_button').className = 'btn btn-success'
+				setTimeout(function(){get_status()},500)
+			}
+			else if (this.status != 200) {
+				document.getElementById('begin_xunjian_button').value='开始巡检'
+				document.getElementById('begin_xunjian_button').className = 'btn btn-danger'
+				setTimeout(function(){get_status()},500)
+				alert("巡检脚本所在的服务器网络有问题.... 或者服务未启动, 或者端口不对(或者服务器内部问题, 请登录服务器查看).")
+			}
+		}
+		data1 = JSON.stringify({"parallel":parallel,"data":data})
+		//alert(data1)
+		xhr.send(data1)
+		setTimeout(function(){get_status()},500)
+		//document.getElementById('begin_xunjian_button').value='开始巡检'
+	}
+
+
+
+
+	function showe(e){
+		var be="b"+e
+		var sidebar_list = ["new_inspection","running","complete","item","global_config"]
+		for (var i = 0; i < sidebar_list.length; i ++){
+			document.getElementById(sidebar_list[i]).style.display="none"
+			document.getElementById("b"+sidebar_list[i]).style.backgroundColor="#111"
+			document.getElementById("b"+sidebar_list[i]).getElementsByTagName('a')[0].style.color='grey'
+		}
+
+		document.getElementById(e).style.display=""
+		document.getElementById(be).style.backgroundColor="#0066FF"
+		document.getElementById(be).getElementsByTagName('a')[0].style.color='white'
+
+		if (e=="running" || e=="complete"){
+			get_status()
+		}
+
+		if (e=="item"){
+			//get_item()
+			show_item()
+			//aa = 1
+		}
+
+		if (e=="global_config"){
+			//get_item()
+			show_global_config()
+			//aa = 1
+		}
+
+		//get_status()
+
+
+	};
+
+
+	function show_global_config(){
+		var $table = $('#table2')
+		urls = location.protocol + "//" + location.hostname + ":" + location.port + "/inspection_global"
+		formdata = new FormData();
+		let xhr = new XMLHttpRequest();
+		xhr.open('POST', urls, true);
+		xhr.onreadystatechange = function () {
+			if (this.readyState == 4 && this.status == 200) {
+				rsp_text = JSON.parse(xhr.responseText)['data']
+				var data = new Array();
+				for (var item in rsp_text){
+					data.push({'obj_name':item,'value':rsp_text[item]})
+				}
+				//alert(JSON.stringify(rsp_text))
+				//alert(data)
+				$(function(){
+					$table.bootstrapTable({
+						data:data,
+						sortable: true,
+						search: true,
+						pagination: true,
+						pageList: [10, 20, ],
+						columns:[
+							{
+							  field: 'obj_name',
+							  title: '参数',
+							  sortable: true,
+							  //align: 'center'
+							},
+							{
+							  field: 'value',
+							  title: '值',
+							  sortable: true,
+							  //align: 'center'
+							},
+
+						]
+					})
+				})
+			}
+		}
+		xhr.send(formdata)
+	}
+
+	function show_item(){
+		var $table = $('#table')
+		urls = location.protocol + "//" + location.hostname + ":" + location.port + "/inspection_item"
+		formdata = new FormData();
+		let xhr = new XMLHttpRequest();
+		xhr.open('POST', urls, true);
+		xhr.onreadystatechange = function () {
+			if (this.readyState == 4 && this.status == 200) {
+				rsp_text = JSON.parse(xhr.responseText)['data']
+				var data = new Array();
+				for(var key in rsp_text ){
+					data[key] = rsp_text[key]
+					data[key]['Warning'] = JSON.stringify(rsp_text[key]['Warning'])
+					data[key]['Error'] = JSON.stringify(rsp_text[key]['Error'])
+					if (typeof(rsp_text[key]['Enabled'])=='undefined'){
+						data[key]['Enabled']='true'
+					}
+					if(data[key]['Enabled']=='true' || data[key]['Enabled']==true){
+						data[key]['Enabled']="是"
+					}
+					else{data[key]['Enabled']="否" }
+
+					if(data[key]['Type']==1){data[key]['Type']='安全与稳定'}
+					else if(data[key]['Type']==2){data[key]['Type']='性能与规范'}
+					else if(data[key]['Type']==3){data[key]['Type']='高可用'}
+					else if(data[key]['Type']==4){data[key]['Type']='资源'}
+					else if(data[key]['Type']==5){data[key]['Type']='基础信息'}
+					else if(data[key]['Type']==6){data[key]['Type']='其它'}
+				}
+				//$table.bootstrapTable({data: data})
+				$(function(){
+					//data = rsp_text
+					//var data = [{'Object_name':'aa','Des':'Des','Score':'Score','Type':'Type','Warning':'Warning','Error':'Error','Enabled':'Enabled'}]
+					$table.bootstrapTable({
+						data:data,
+						sortable: true,
+						search: true,
+						pagination: true,
+						pageList: [10, 20, 30, 100],
+						columns:[
+							{
+							  field: 'Object_name',
+							  title: '巡检项',
+							  sortable: true,
+							  //align: 'center'
+							},
+							{
+							  field: 'Des',
+							  title: '描述',
+							  sortable: true,
+							  //align: 'center'
+							},
+							{
+							  field: 'Score',
+							  title: '分值(权重)',
+							  sortable: true,
+							  //align: 'center'
+							},
+							{
+							  field: 'Type',
+							  title: '类型',
+							  sortable: true,
+							  //align: 'center'
+							},
+							{
+							  field: 'Warning',
+							  title: 'Warning阈值',
+							  sortable: true,
+							  //align: 'center'
+							},
+							{
+							  field: 'Error',
+							  title: 'Error阈值',
+							  sortable: true,
+							  //align: 'center'
+							},
+							{
+							  field: 'Enabled',
+							  title: '是否启用',
+							  sortable: true,
+							  //align: 'center'
+							},
+						]
+						})
+				})
+			}
+		}
+		xhr.send(formdata)
+	}
+
+
+	function get_status(){
+		//console.log("get_status")
+		urls = location.protocol + "//" + location.hostname + ":" + location.port + "/inspection_status"
+		formdata = new FormData();
+		let xhr = new XMLHttpRequest();
+		xhr.open('POST', urls, true);
+		xhr.onreadystatechange = function () {
+			if (this.readyState == 4 && this.status == 200) {
+				rsp_text = JSON.parse(xhr.responseText)
+				running = ''
+				running_num = 0 //还在巡检中的task
+				complete = ''
+				complete_num = 0  //巡检完成的task
+				th_complete = "<thead><tr><th>任务名</th><th>实例地址</th><th>实例端口</th><th>开始时间</th><th>结束时间</th><th>得分</th><th>状态</th><th>巡检报告</th><th>操作</th></tr></thead>"
+				th_running = "<thead><tr><th>任务名</th><th>实例地址</th><th>实例端口</th><th>开始时间</th><th>当前状态</th><th>状态</th><th>巡检报告</th></tr></thead>"
+				for (var taskname in rsp_text['task']){
+					taskdetail = rsp_text['task'][taskname]['detail']
+					jindu = rsp_text['task'][taskname]['jindu']
+					if (jindu[0] < jindu[1]){
+						running_num += 1
+						//未完成队列 整个是个task
+						td_total_running = '<tr><td align="center" rowspan="'+taskdetail.length+'">'+taskname+'('+jindu[0]+'/'+jindu[1]+')'+'</td>'
+						isfirst = 1
+						for ( var task_detail_name_item in taskdetail){
+							task_detail_name = taskdetail[task_detail_name_item]
+							host = rsp_text['task_detail'][task_detail_name]['host']
+							port = rsp_text['task_detail'][task_detail_name]['port']
+							running1 = rsp_text['task_detail'][task_detail_name]['running']
+							result = rsp_text['task_detail'][task_detail_name]['result']
+							stat = rsp_text['task_detail'][task_detail_name]['stat']
+							begin_time = rsp_text['task_detail'][task_detail_name]['begin_time']
+							if (stat == 2){
+								stat = "巡检完成"
+							}
+							else if (stat == 3){
+								stat = "巡检失败"
+							}
+							else{
+								stat = "巡检中"
+							}
+							if (isfirst == 1){
+								tr_running = "<td>"+host+"</td>"+"<td>"+port+"</td>"+"<td>"+begin_time+"</td>"+"<td>"+running1+"</td>"+"<td>"+stat+"</td>"+"<td>"+result+"</td>"+"</tr>"
+							}
+							else{
+								tr_running = "<tr>"+"<td>"+host+"</td>"+"<td>"+port+"</td>"+"<td>"+begin_time+"</td>"+"<td>"+running1+"</td>"+"<td>"+stat+"</td>"+"<td>"+result+"</td>"+"</tr>"
+}
+							td_total_running += tr_running
+						}
+						running += td_total_running
+					}
+					else	{
+						//完成队列
+						complete_num += 1
+						//alert(taskname)
+						td_total = '<tr><td align="center" rowspan="'+taskdetail.length+'">'+taskname+'</td>'
+						isfirst = 1
+						for ( var task_detail_name_item in taskdetail){
+							task_detail_name = taskdetail[task_detail_name_item]
+							//alert(taskdetail[task_detail_name])
+							//alert(typeof(rsp_text['task_detail'][taskdetail['task_detail_name']]))
+							//for (var item in rsp_text['task_detail']){
+							//	alert(rsp_text['task_detail'][item]['host'])
+							//}
+							//alert(rsp_text['task_detail'][task_detail_name]['host'])
+							//complete += rsp_text['task_detail'][task_detail_name]['host']
+							host = rsp_text['task_detail'][task_detail_name]['host']
+							port = rsp_text['task_detail'][task_detail_name]['port']
+							running2 = rsp_text['task_detail'][task_detail_name]['running']
+							result = rsp_text['task_detail'][task_detail_name]['result']
+							stat = rsp_text['task_detail'][task_detail_name]['stat']
+							begin_time = rsp_text['task_detail'][task_detail_name]['begin_time']
+							end_time = rsp_text['task_detail'][task_detail_name]['end_time']
+							score = rsp_text['task_detail'][task_detail_name]['score']
+							if ((stat == 2)||score>=1){
+								stat = "成功"
+							}
+							else{
+								//alert(running2)
+								stat = "失败"
+							}
+							if ((isfirst == 1 && stat=="成功")||score>=1){
+								tr = "<td>"+host+"</td>"+"<td>"+port+"</td>"+"<td>"+begin_time+"</td>"+"<td>"+end_time+"</td>"+"<td>"+score+"</td>"+"<td class='text-success'>"+stat+"</td>"+"<td>"+result+"</td>"+"<td>"+"<a href='/view/"+result+"' target='_blank'> 预览</a> &nbsp; | &nbsp; <a href='/download?file_name="+result+"&amp;file_type=html'>下载HTML</a>"+"</td>"+"</tr>"
+							}
+							else{
+								tr = "<td>"+host+"</td>"+"<td>"+port+"</td>"+"<td>"+begin_time+"</td>"+"<td>"+end_time+"</td>"+"<td>"+score+"</td>"+"<td class='text-danger'>"+stat+"</td>"+"<td colspan='3'>"+running2+"</td>"+"</tr>"
+}
+							td_total += tr
+						}
+						complete += td_total
+					}
+				}
+				//rsp_text = xhr.responseText
+				//alert(rsp_text)
+				complete_html = "<table align='center'  class='table table-hover' ><tbody>" + th_complete + complete + "</tbody> </table>"
+				running_html = "<table align='center'  class='table table-hover' ><tbody>" + th_running + running + "</tbody> </table>"
+				document.getElementById("running").innerHTML = running_html
+				document.getElementById("brunning").getElementsByTagName('a')[0].innerHTML = "巡检中("+running_num+")"
+				document.getElementById("complete").innerHTML = complete_html
+				document.getElementById("bcomplete").getElementsByTagName('a')[0].innerHTML = "巡检完成("+complete_num+")"
+				//alert(running_html)
+				//alert(running)
+			}
+		}
+		xhr.send(formdata)
+	}
+
+
+
+
+window.onload = function(){
+open_tab = location.hash.split("#")[1]
+if (typeof(open_tab) != "undefined"){
+	showe(open_tab)
+	get_status()
+	//click_running_complate("running")
+	//click_running_complate("complete")
+}
+else{
+showe('new_inspection')
+}
+}
+console.log("最新下载地址: https://github.com/ddcw/inspection")
+	</script>
+</head>
+<body>
+
+<div class="leftnav">
+	<button  class="btn"  id="bnew_inspection" onclick="showe('new_inspection')" style="background-color:#0066FF"><a href="#new_inspection">开始巡检</a></button>
+	<button  class="btn" id="brunning" onclick="showe('running')"><a href="#running">巡检中</a></button>
+	<button  class="btn" id="bcomplete" onclick="showe('complete')"><a href="#complete">巡检完成</a></button>
+	<button  class="btn" id="bitem" onclick="showe('item')"><a href="#item">巡检项</a></button>
+	<button  class="btn" id="bglobal_config" onclick="showe('global_config')"><a href="#global_config">全局设置</a></button>
+</div>
+
+
+
+<!-- 内容 -->
+<div class="main">
+<div id="new_inspection" align='center'>
+                      <p align='center'>并发度</p>
+                      <input type="number" class="knob" data-width="100" data-height="120" data-min="-100" data-displayprevious="true" data-fgcolor="#26B99A" value="4" id='parallel' >
+
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>HOST</th>
+        <th>PORT</th>
+        <th>USER</th>
+        <th>PASSWORD</th>
+        <th>SSH_PORT</th>
+        <th>SSH_USER</th>
+        <th>SSH_PASSWORD</th>
+      </tr>
+    </thead>
+    <tbody align='center'>
+      <tr>
+        <td><input name="host" type="text" name="host" value="127.0.0.1" /></td>
+        <td><input name="port" type="number" name="port" value="3306" /></td>
+        <td><input name="user" type="text" name="user" value="root" /></td>
+        <td><input name="password" type="password" name="password" value="123456" /></td>
+        <td><input name="ssh_port" type="number" name="ssh_port" value="22" /></td>
+        <td><input name="ssh_user" type="text" name="ssh_user" value="root" /></td>
+        <td><input name="ssh_password" type="password" name="ssh_password" value="123456" /></td>
+        <td><input type="button" value='复制' onclick='copy_this(this)'><input type="button" value='删除' onclick='delete_this(this)'></td>
+      </tr>
+    </tbody>
+</table>
+<input type="button" onclick="test_conn()"  value="测试连接" class='btn btn-secondary' style='display:none'/>
+<input id="begin_xunjian_button" type="button" value="开始巡检" onclick="inspection()" class='btn btn-primary'  />
+
+</div>
+
+
+<div id="multi_inspection" style="display:none">
+批量巡检
+<form  method="post" action="/mf"  enctype="multipart/form-data">
+	<input name="file" id="file" type="file">
+	<input id="mksxj" type="submit" value="开始巡检" "></input>
+</form>
+</div>
+
+
+
+<div id="running" style="display:none">
+查看进行中
+</div>
+
+<div id="complete" style="display:none">
+<pre>你不会看到这个, 除非你看到了这个</pre>
+</div>
+
+<div id="item" style="display:none">
+<table id="table" class="table table-hover">
+	<thead class="table-light">
+		<tr>
+			<th data-field='Object_name'>巡检项</th>
+			<th data-field='Des'>描述</th>
+			<th data-field='Score' sortable=true>分值(权重)</th>
+			<th data-field='Type'>类型</th>
+			<th data-field='Warning'>Warning阈值</th>
+			<th data-field='Error'>Error阈值</th>
+			<th data-field='Enabled'>是否启用</th>
+		</tr>
+	</thead>
+</table>
+
+</div>
+
+
+
+<div id="global_config" style="display:none">
+<pre style="display:none">你不会看到这个, 除非你看到了这个</pre>
+<table id="table2" class="table table-hover"></table>
+</div>
+
+
+</div>
+<script>
+	$('#begin_xunjian_button111').on('click',function () {
+		alert("OK")
+		parallel = document.getElementById("parallel").value
+		host = document.getElementsByName("host")
+		port = document.getElementsByName("port")
+		user = document.getElementsByName("user")
+		password = document.getElementsByName("password")
+		ssh_port = document.getElementsByName("ssh_port")
+		ssh_user = document.getElementsByName("ssh_user")
+		ssh_password = document.getElementsByName("ssh_password")
+
+		var data = new Array();
+		for (var i=0; i<host.length; i++){
+			instance = {
+					'host':host[i].value,
+					'port':port[i].value,
+					'user':user[i].value,
+					'password':password[i].value,
+					'ssh_port':ssh_port[i].value,
+					'ssh_user':ssh_user[i].value,
+					'ssh_password':ssh_password[i].value,
+			}
+			data[i] = instance
+			//alert(host[i].value)
+		}
+		alert(JSON.stringify(data))
+		$.ajax({
+			url:location.protocol + "//" + location.hostname + ":" + location.port + "/inspection_web",
+			type:'post',
+			contentType:'application/json',
+			data:{"parallel":parallel,"data":data},
+			success:function (data){
+				alert(data)
+			}
+		})
+	})
+</script>
+</body>
+</html>

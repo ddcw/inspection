@@ -22,7 +22,7 @@ class set:
 		try:
 			self.database = kwargs["database"]
 		except:
-			self.database = "information_schema"
+			self.database = None
 		try:
 			self.password = kwargs["password"]
 		except:
@@ -41,10 +41,10 @@ class set:
 			database=self.database,
 			unix_socket = self.socket,
 			)
-			return conn
+			return {"status":True,"data":conn}
 		except Exception as e:
-			print(e)
-			return False
+			#print(e)
+			return {"status":False,"data":e}
 
 	#测试连接, 成功返回True
 	def test(self):
@@ -61,10 +61,10 @@ class set:
 			cursor.execute("show databases;")
 			data = cursor.fetchall()
 			conn.close()
-			return True
+			return {"status":True,"data":conn}
 		except Exception as e:
-			print(e)
-			return False
+			#print(e)
+			return {"status":False,"data":e}
 
 	#设置连接, 设置连接之后才可以执行sql
 	def set(self):

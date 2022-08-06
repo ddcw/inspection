@@ -1,0 +1,780 @@
+GLOBAL:
+  Data_collection_time : 90 #数据采集时间, 单位秒
+  Data_collection_interval : 1 #数据采集间隔, 单位秒 建议1, 这样模板里面就可以省去除以时间的操作
+  Log_file : 'logs/inspection.log' #巡检日志文件, 为空表示每个task一个日志, 格式为 task_id.log
+  Type : 'html'
+  Dict_passowrd : "conf/basic_passwords.txt" #密码字典的路径
+  Web_host : '0.0.0.0' #默认值, 优先手动指定
+  Web_port : 80 #v2.1版本默认端口改为80
+  Web_user : "ddcw"  #v2.2再支持
+  Web_password : "123456" #v2.2再支持 若为空, 就是随机密码(定长 32位)
+  Tmp_dir : "tmp" #生成的巡检报告存放目录 
+  Html : "templates/template.html" #默认为html巡检报告模板, 模板均使用jinja2语法
+  Doc : "templates/template.docx"
+  Xls : "templates/template.xls"
+  #Csv : "templates/template.csv" #csv 不需要模板, 直接输出, 这里只是为了好看写的.
+  Enable_Shell : True #是否启用主机巡检. (暂不支持自定义主机巡检项)
+  Mysql_Error_Log : False #是否巡检MYSQL错误日志(不建议)
+  Mysql_Slow_Log : False #是否巡检MYSQL慢日志(不建议)
+  Save_Raw_Data : False #是否保存原始数据 xxxx.data  (v2.3之后支持)
+  Online : 0 #0 表示可以离线使用巡检报告,  1表示巡检报告的样式来自本服务器(不建议)
+  History_task : False #时候含历史巡检报告, 在Tmp_dir下面寻找符合的巡检报告
+  History_task_pre : 'HISTORY_' #历史巡检前端展示的TASK前缀
+
+
+#Warning 和 Error 各巡检项意义不一样
+
+#Type各字段解释
+#1 安全与稳定
+#2 性能与规范
+#3 高可用(集群)
+#4 资源
+#5 基础信息(评分默认为0)
+#6 其它
+INSPECTION:
+  - Object_name : 'no_primary_key' #此巡检项的名字 和 函数名字完全对应
+    Des : '无主键的表'
+    Enabled : True
+    Score : 5
+    Type : 2
+    Error : 10  #达到10张表产生error, 并扣全部分
+    Warning : 1  #达到1张表产生warning 并扣30%分
+
+  - Object_name : 'redundant_indexes' #冗余索引
+    Des : '冗余索引'
+    Enabled : True #默认为True
+    Score : 2
+    Type : 4
+    Error : 20
+    Warning : 1
+
+  - Object_name : 'unused_indexes'
+    Des : '未使用的索引'
+    Score : 2
+    Type : 4
+    Error : 50
+    Warning : 10
+  
+  - Object_name : 'full_table_scans'
+    Des : '全表扫描的表'
+    Score : 1
+    Type : 2
+    Error : 20
+    Warning : 1
+
+  - Object_name : 'partitions'
+    Des : '分区表'
+    Score : 1
+    Type : 2
+    Error : 20
+    Warning : 1
+
+  - Object_name : 'auto_increment_columns'
+    Des : '自增键使用率'
+    Enabled : True
+    Score : 4
+    Type : 1
+    Error : 0.95 #使用率达到95%
+    #Error : 0.05 #测试数据
+    Warning : 0.80 #使用率达到80%
+    #Warning : 0.03
+
+  - Object_name : 'special_column'
+    Des : '特殊字段, 比如text,blob,longblob等, 目前暂不支持'
+    Enabled : False
+    Score : 1
+    Type : 2
+    Error : 20
+    Warning : 1
+
+  - Object_name : 'table_info'
+    Des : '表基础信息'
+    Enabled : False
+    Score : 0
+    Type : 2
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'cold_table'
+    Des : '冷表'
+    Enabled : True
+    Score : 1
+    Type : 2
+    Error : 365 #一年未使用
+    Warning : 180 #半年未使用达到warning
+
+  - Object_name : 'no_innodb'
+    Des : '非innodb表'
+    Enabled : True
+    Score : 5
+    Type : 2
+    Error : 20 
+    Warning : 3 
+
+  - Object_name : 'big_table'
+    Des : '大表'
+    Enabled : True
+    Score : 1
+    Type : 2
+    Error : {'rows':50000000,'size':107374182400} #5000万行 100GB
+    Warning : {'rows':10000000,'size':32212254720} #1000万行  30GB
+
+  - Object_name : 'table_static_expired'
+    Des : '统计信息过期的表'
+    Enabled : True
+    Score : 5
+    Type : 2
+    Error : 180 
+    Warning : 60 #超过60天, 达到error 
+
+  - Object_name : 'table_fragment'
+    Des : '碎片表'
+    Enabled : True
+    Score : 5
+    Type : 4
+    Error : 80 #有达到80碎片的表
+    Warning : 30  #有达到30的碎片的表
+
+  - Object_name : 'is_nullable'
+    Des : '可以为空的字段'
+    Enabled : True
+    Score : 1
+    Type : 2
+    Error : 90 
+    Warning : 10 #字段数量达到10  
+
+  - Object_name : 'same_user_password'
+    Des : '用户名和密码相同账号, 目前仅支持 mysql_native_password'
+    Enabled : True
+    Score : 4
+    Type : 1
+    Error : 5 
+    Warning : 1 #
+
+  - Object_name : 'expired_password'
+    Des : '密码过期的用户'
+    Enabled : True
+    Score : 1
+    Type : 1
+    Error : 5 
+    Warning : 1 #
+
+  - Object_name : 'anonymous_user'
+    Des : '匿名用户, 用户名为空'
+    Enabled : True
+    Score : 1
+    Type : 1
+    Error : 5 
+    Warning : 1 #
+
+  - Object_name : 'any_host'
+    Des : '主机名为%的账号'
+    Enabled : True
+    Score : 1
+    Type : 1
+    Error : 10 
+    Warning : 3 #有3个主机名为%的就告警
+
+  - Object_name : 'simple_password'
+    Des : '密码简单的用户, 使用密码字典(仅支持mysql_native_password)'
+    Enabled : True
+    Score : 4
+    Type : 1
+    Error : 5
+    Warning : 1
+
+  - Object_name : 'account_user'
+    Des : '已锁用户'
+    Enabled : True
+    Score : 1
+    Type : 1
+    Error : 5
+    Warning : 1
+
+  - Object_name : 'innodb_buffer_stats_by_schema'
+    Des : '各库内存使用情况'
+    Enabled : True
+    Score : 0
+    Type : 4
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'innodb_buffer_stats_by_table'
+    Des : '各表内存使用情况'
+    Enabled : True
+    Score : 0
+    Type : 4
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'memory_global_by_current_bytes'
+    Des : '各事件内存使用情况'
+    Enabled : True
+    Score : 0
+    Type : 4
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'io_by_thread_by_latency'
+    Des : 'IO使用, 按线程分组'
+    Enabled : True
+    Score : 0
+    Type : 4
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'io_global_by_wait_by_latency'
+    Des : '全局IO等待, 按事件分组'
+    Enabled : True
+    Score : 0
+    Type : 4
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'user_summary_by_file_io'
+    Des : '用户IO'
+    Enabled : True
+    Score : 0
+    Type : 4
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'io_global_by_file_by_bytes'
+    Des : '各文件IO使用, 按总IO降序, 默认只显示前500'
+    Enabled : True
+    Score : 0
+    Type : 4
+    Error : 0
+    Warning : 0
+    Other : 500 #特殊参数, 由每个巡检函数自己解析,
+
+  - Object_name : 'tmp_table'
+    Des : '使用内部临时表的SQL'
+    Enabled : True
+    Score : 1
+    Type : 4
+    Error : 1000
+    Warning : 100 #使用临时表达到100条SQL就告警
+
+  - Object_name : 'tmp_file'
+    Des : '使用内部磁盘临时表的SQL'
+    Enabled : True
+    Score : 2
+    Type : 4
+    Error : 100
+    Warning : 10 #使用临时表达到10条SQL就告警
+
+  - Object_name : 'schema_table_lock_waits'
+    Des : '显示哪些会话在等待元数据锁时被阻塞，以及是什么阻塞了它们'
+    Enabled : True
+    Score : 1
+    Type : 6
+    Error : 20
+    Warning : 1 
+
+  - Object_name : 'wait_classes_global_by_latency'
+    Des : '等待类, 按延迟降序'
+    Enabled : True
+    Score : 0
+    Type : 2
+    Error : 0
+    Warning : 0 
+
+  - Object_name : 'waits_global_by_latency'
+    Des : '等待事件, 按总延迟降序'
+    Enabled : True
+    Score : 0
+    Type : 2
+    Error : 0
+    Warning : 0 
+
+  - Object_name : 'innodb_lock_waits'
+    Des : 'INNODB 锁 (当前)'
+    Enabled : True
+    Score : 5
+    Type : 2
+    Error : 5
+    Warning : 1 
+
+  - Object_name : 'key_buffer_read_hits'
+    Des : 'key_buffer读命中率 仅支持MyIsam'
+    Enabled : True
+    Score : 1
+    Type : 2
+    Error : 95
+    Warning : 99
+
+  - Object_name : 'key_buffer_write_hits'
+    Des : 'key_buffer写命中率 仅支持MyIsam'
+    Enabled : True
+    Score : 1
+    Type : 2
+    Error : 95
+    Warning : 99
+
+  - Object_name : 'query_cache_hits'
+    Des : '查询缓存命中率, 建议关闭'
+    Enabled : True
+    Score : 1
+    Type : 2
+    Error : 95
+    Warning : 99
+
+  - Object_name : 'innodb_buffer_read_hits'
+    Des : 'innodb 缓冲池 读命中率'
+    Enabled : True
+    Score : 5
+    Type : 2
+    Error : 95
+    Warning : 99
+
+  - Object_name : 'threads_hits'
+    Des : '线程缓存命中率, 太低的话, 可以增加thread_cache_size'
+    Enabled : False
+    Score : 1
+    Type : 2
+    Error : 50
+    Warning : 80
+
+  - Object_name : 'slow_query_ps'
+    Des : '平均每秒的慢查询(Slow_queries/uptime)'
+    Enabled : True
+    Score : 1
+    Type : 2
+    Error : 10
+    Warning : 1
+
+  - Object_name : 'table_open_cache_hits'
+    Des : '表缓存命中率' #Table_open_cache_hits/(Table_open_cache_hits+Table_open_cache_misses)
+    Enabled : True
+    Score : 1
+    Type : 2
+    Error : 90
+    Warning : 80
+
+  - Object_name : 'innodb_mem_used'
+    Des : 'innodb内存使用率' #Innodb_buffer_pool_pages_data/Innodb_buffer_pool_pages_total 
+    Enabled : True
+    Score : 3
+    Type : 2
+    Error : 98 #超过98 就告警ERROR
+    Warning : 10 #低于10 就告警Warning 
+
+  - Object_name : 'bytes_received_list'
+    Des : '网速(入)'  #返回的是2个数组,时间list 和 数据list {time:timelist,data:datalist,avg:vg}
+    Enabled : True
+    Score : 0
+    Type : 6
+    Error : 0 
+    Warning : 0
+
+  - Object_name : 'bytes_sent_list'
+    Des : '网速(出)'  #返回的是2个数组,时间list 和 数据list {time:timelist,data:datalist}
+    Enabled : True
+    Score : 0
+    Type : 6
+    Error : 0 
+    Warning : 0
+
+  - Object_name : 'conn_used_percent'
+    Des : '连接数使用率'  
+    Enabled : True
+    Score : 1
+    Type : 4
+    Error : 95 
+    Warning : 80
+
+  - Object_name : 'innodb_read_write'
+    Des : 'innodb数据量读写' #Innodb_data_read / Innodb_data_written  (不计算, 返回列表 [read,write] 方便前端画图)
+    Enabled : True
+    Score : 0
+    Type : 5
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'innodb_read'
+    Des : 'innodb读数据速度' 
+    Enabled : True
+    Score : 0
+    Type : 5
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'innodb_write'
+    Des : 'innodb写数据速度' 
+    Enabled : True
+    Score : 0
+    Type : 5
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'redo_log_write'
+    Des : 'innodb写入磁盘数据量的速度' #两个列表, 时间和数据 方便画图
+    Enabled : True
+    Score : 0
+    Type : 5
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'double_write_rate'
+    Des : '双写速度(次)'
+    Enabled : True
+    Score : 0
+    Type : 5
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'tps_qps'
+    Des : 'TPS和QPS 列表(未除以时间)' #{time:time,data1:tps_list,data2:qps_list} #QPS计算参考的mysql客户端工具\s的算法, 即为Queries/time 
+    Enabled : True
+    Score : 0
+    Type : 5
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'slave_info'
+    Des : '从库相关信息' 
+    Enabled : True
+    Score : 5 #如果是主从库, 就按照5分来算, 其它架构,按照其它架构的分数来算
+    Type : 3
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'pxc_info'
+    Des : 'PXC集群相关信息' 
+    Enabled : True
+    Score : 5 
+    Type : 3
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'mgr_info'
+    Des : 'MGR集群相关信息' 
+    Enabled : True
+    Score : 5 
+    Type : 3
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'master_info'
+    Des : '主库相关信息' 
+    Enabled : True
+    Score : 0 
+    Type : 3
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'ndb_info'
+    Des : 'NDB集群相关信息(预计v2.2之后支持)' 
+    Enabled : False
+    Score : 0 
+    Type : 3
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'triggers'
+    Des : '触发器' #不建议有触发器
+    Enabled : True
+    Score : 1 
+    Type : 1
+    Error : 10
+    Warning : 1
+
+  - Object_name : 'views'
+    Des : '视图' #不建议使用视图
+    Enabled : True
+    Score : 1 
+    Type : 2
+    Error : 20
+    Warning : 5
+
+  - Object_name : 'routines'
+    Des : '存储过程和函数' #不建议使用视图
+    Enabled : True
+    Score : 1 
+    Type : 2
+    Error : 10
+    Warning : 1
+
+  - Object_name : 'engine_innodb'
+    Des : 'innodb 引擎状态' #不计算分数(预计v2.2计算是否有锁等信息)
+    Enabled : True
+    Score : 0 
+    Type : 6
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'engine_tokudb'
+    Des : 'tokudb 引擎状态' #
+    Enabled : False
+    Score : 0 
+    Type : 6
+    Error : 0
+    Warning : 0
+
+
+  - Object_name : 'var_default_storage_engine'
+    Des : '默认存储引擎建议innodb' #参数
+    Enabled : True
+    Score : 1 
+    Type : 5
+    Error : 0
+    Warning : ['InnoDB',] #建议值
+
+  - Object_name : 'var_innodb_flush_log_at_trx_commit'
+    Des : '建议每个事务刷一次redo日志' #参数
+    Enabled : True
+    Score : 1 
+    Type : 5
+    Error : 0
+    Warning : 1 #建议值
+
+  - Object_name : 'var_sync_binlog'
+    Des : '建议每个事务刷新一次Binlog' #参数
+    Enabled : True
+    Score : 1 
+    Type : 5
+    Error : 0
+    Warning : 1 #建议值
+
+  - Object_name : 'var_general_log'
+    Des : '建议关闭general_log' 
+    Enabled : True
+    Score : 1 
+    Type : 5
+    Error : 0
+    Warning : 'OFF'
+
+  - Object_name : 'var_slow_query_log'
+    Des : '建议开启慢日志记录' 
+    Enabled : True
+    Score : 1 
+    Type : 5
+    Error : 0
+    Warning : 'ON'
+
+  - Object_name : 'var_log_bin'
+    Des : '建议开启binlog' 
+    Enabled : True
+    Score : 1 
+    Type : 5
+    Error : 0
+    Warning : 'ON'
+
+  - Object_name : 'var_expire_logs' #TODO
+    Des : 'binlog过期时间' #5.7 expire_logs_days   8.0 binlog_expire_logs_seconds (秒) 
+    Enabled : False
+    Score : 0 
+    Type : 4
+    Error : 0
+    Warning : 0
+
+  - Object_name : 'var_qcache'
+    Des : '建议关闭查询缓存' 
+    Enabled : True
+    Score : 1 
+    Type : 5
+    Error : 0
+    Warning : 0 #have_query_cache不准确, 故使用Qcache_queries_in_cache来判断,
+
+  - Object_name : 'var_transaction_isolation'
+    Des : '建议事务隔离级别为RC/RR' 
+    Enabled : True
+    Score : 1 
+    Type : 5
+    Error : 0
+    Warning : ['REPEATABLE-READ','READ-COMMITTED']
+
+  - Object_name : 'var_innodb_buffer_pool_size'
+    Des : '建议大于1G' #预计v2.3版本 将结合内存来判断, 60%-80% 
+    Enabled : True
+    Score : 1 
+    Type : 5
+    Error : 0
+    Warning : 1073741824 #1G
+
+  - Object_name : 'var_innodb_lru_scan_depth'
+    Des : 'innodb_lru_scan_depth' #若IO负载较大, 可以减少此值
+    Enabled : True
+    Score : 0 
+    Type : 5
+    Error : 0
+    Warning : 0 #后续版本会根据系统IO来评估这个参数, 目前不做评分
+
+  - Object_name : 'var_max_allowed_packet'
+    Des : 'max_allowed_packet' #
+    Enabled : False # 这个参数太大了, 意义不大(大包会占用大的内存,应该避免大的数据), 所以不做检查了 2022.08.04
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 536870912 #建议至少512M
+
+  - Object_name : 'var_server_id'
+    Des : 'server_id范围 0-2^server_id_bits' #建议规范化, IP加端口来区分,
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 10000 #所以长度建议至少为5位数
+
+  - Object_name : 'var_innodb_log_file_size'
+    Des : 'innodb_log_file_size redo大小建议1G'
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 1073741824 #1G
+
+  - Object_name : 'var_innodb_log_files_in_group'
+    Des : '日志组中日志文件的数量, 建议至少4个'
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 4
+
+  - Object_name : 'var_innodb_page_size'
+    Des : 'innodb_page_size'
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 16384
+
+  - Object_name : 'var_innodb_doublewrite'
+    Des : '虽然数据被写入两次,但双写缓冲区不需要两倍的I/O开销'
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 'ON' #建议ON
+
+  - Object_name : 'var_gtid_mode'
+    Des : 'gtid'
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : ['ON','ON_PERMISSIVE'] #ON_PERMISSIVE 新事物是GTID事务,复制事务可以是匿名事务
+
+  - Object_name : 'var_performance_schema'
+    Des : '建议开启performance_schema库'
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 'ON'
+
+  - Object_name : 'var_character_set_database'
+    Des : 'character_set_database'
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : ['utf8','utf8mb4','utf8mb3'] #不在这里面的就算warning
+
+  - Object_name : 'var_binlog_format'
+    Des : 'binlog_format'
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 'ROW'
+
+  - Object_name : 'var_binlog_row_image'
+    Des : 'binlog_row_image'
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 'FULL'
+
+  - Object_name : 'var_max_connections'
+    Des : 'max_connections'
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 5000 #建议大于5000
+
+  - Object_name : 'var_innodb_io_capacity'
+    Des : '定义innodb的iops(mysql并不知道系统支持的IOPS是好多..)'
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 2500 #建议大于2500
+
+  - Object_name : 'var_innodb_io_capacity_max'
+    Des : 'innodb_io_capacity_max'
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 5000 
+
+  - Object_name : 'var_innodb_log_buffer_size'
+    Des : 'redo缓存大小' #建议大于3.5倍avg_written 
+    Enabled : True
+    Score : 1
+    Type : 5
+    Error : 0
+    Warning : 3.5 #3.5倍sys.io_global_by_wait_by_latency(avg_written) event_name: innodb/innodb_log_file
+
+  - Object_name : 'error_log'
+    Des : 'performance_schema.error_log' #仅8.0支持
+    Enabled : True
+    Score : 1
+    Type : 6
+    Error : 30
+    Warning : 1 #Error数量达到1就告警
+    Other : 7 #最近7天的错误日志
+
+  - Object_name : 'schema_object_overview'
+    Des : '各库对象数量' 
+    Enabled : True
+    Score : 0
+    Type : 4
+    Error : 0
+    Warning : 0 
+
+  - Object_name : 'foreign_key' #TODO
+    Des : '外键约束' 
+    Enabled : False #有空了再写 information_schema.KEY_COLUMN_USAGE 中REFERENCED_TABLE_SCHEMA REFERENCED_TABLE_NAME REFERENCED_COLUMN_NAME
+    Score : 0
+    Type : 4
+    Error : 0
+    Warning : 0 
+
+  - Object_name : 'long_trx' #TODO
+    Des : '长事务' 
+    Enabled : False #有空了再写  information_schema.INNODB_TRX  开始时间trx_started 超过100秒
+    Score : 0
+    Type : 4
+    Error : 0
+    Warning : 0 
+
+  - Object_name : 'big_trx' #TODO
+    Des : '大事务' 
+    Enabled : False #有空了再写  information_schema.INNODB_TRX  trx_weight根据权重来判断, 不够严谨, 后续写的时候再研究吧
+    Score : 0
+    Type : 4
+    Error : 0
+    Warning : 0 
+
+  - Object_name : 'memory_global_total' #2022.08.05
+    Des : 'mysql已使用内存' 
+    Enabled : True #
+    Score : 0
+    Type : 4
+    Error : 0
+    Warning : 0 
+
+  - Object_name : 'com_sql' #2022.08.05
+    Des : 'sql执行情况' #DML和部分DDL  太多了不好看 
+    Enabled : True #
+    Score : 0
+    Type : 6
+    Error : 0
+    Warning : 0 
+

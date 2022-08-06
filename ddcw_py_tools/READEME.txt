@@ -1,5 +1,0 @@
-dataframe_to_base64.py   #根据dataframe生成图片的base64编码  已弃用(chartjs代替了)
-ddcw_mysql.py  #返回mysql连接
-ddcw_ssh.py  #返回ssh连接
-get_dict_from_sql.py  #根据游标和sql返回dict数据  已弃用
-get_local_comm.py  #在本机执行shell命令

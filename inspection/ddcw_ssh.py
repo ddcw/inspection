@@ -44,12 +44,13 @@ class set:
 					try:
 						ssh.connect(hostname=HOST, port=SSH_PORT, username=SSH_USER, password=SSH_PASSWORD, pkey=paramiko.DSSKey.from_private_key_file(SSH_PKEY))
 					except Exception as e:
-						print(e)
-						return False
+						#print(e)
+						return {"status":False,"data":e}
 			self.ssh = ssh
 		except Exception as e:
 			self.ssh = False
-			return False
+			return {"status":False,"data":e}
+		return {"status":True,"data":""}
 
 
 	def get_conn(self):
@@ -72,8 +73,8 @@ class set:
 					except:
 						pass
 		except Exception as e:
-			print(e)
-			return False
+			#print(e)
+			return {"status":False,"data":e}
 		finally:
 			return ssh
 					
@@ -98,12 +99,12 @@ class set:
 					try:
 						ssh.connect(hostname=HOST, port=SSH_PORT, username=SSH_USER, password=SSH_PASSWORD, pkey=paramiko.DSSKey.from_private_key_file(SSH_PKEY))
 					except Exception as e:
-						print(e,". Please select dsa or rsa private key file")
-						return False
-			return True
+						#print(e,". Please select dsa or rsa private key file")
+						return {"status":False, "data":e}
+			return {"status":True, "data":""}
 		except Exception as e:
-			print(e)
-			return False
+			#print(e)
+			return {"status":False, "data":e}
 
 	#注:命令不存在返回状态码仍为0 得用是否有标准错误来辅助衡量, 其实有stderr或者return code 不为0 也不能说明执行失败....
 	def get_result_dict(self,comm):
