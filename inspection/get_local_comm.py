@@ -28,6 +28,7 @@ class set:
 		
 	#是本地IP就返回True, 不是就返回False,  使用	
 	def is_local_ip(self,host):
+		host = '127.0.0.1' if host is None else host #BUG修复: 当HOST为空的时候会抛出异常
 		localiplist = self.get_result_dict("ifconfig | grep inet  | awk '{print $2}'")['stdout']
 		if host in localiplist or host == '0.0.0.0':
 			return True

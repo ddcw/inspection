@@ -1,5 +1,5 @@
 class inspection:
-	def __init__(self,shell,result,Mysql_Error_Log,Mysql_Slow_Log):
+	def __init__(self,shell,result,c):
 		self.shell = shell
 		file_list = {}
 		dir_list = {}
@@ -15,8 +15,8 @@ class inspection:
 		self.file_list = file_list
 		self.dir_list = dir_list
 		self.global_variables = global_variables
-		self.Mysql_Error_Log = Mysql_Error_Log
-		self.Mysql_Slow_Log = Mysql_Slow_Log
+		self.Mysql_Error_Log = c['mysql_error_log']
+		self.Mysql_Slow_Log = c['mysql_slow_log']
 			
 
 	def run(self):
@@ -29,7 +29,7 @@ class inspection:
 		hostinfo["cpu_thread"] = shell.get_result_dict("lscpu | grep 'Thread(s)' | awk '{print $NF}'")
 		hostinfo["cpu_name"] = shell.get_result_dict("""lscpu | grep name | awk '$1="";$2=""; {print $0}'""")
 
-		#内存部分(含swap)
+		#内存部分(含swap) 大页能提高innodb性能, 但是不明显(百分之几), 又太麻烦, 所以不建议使用大页
 		hostinfo['mem_total'] = shell.get_result_dict("""cat /proc/meminfo | awk  '{ if ( $1 == "MemTotal:") print $2}'""")
 		hostinfo['mem_total']['stdout'] = round(int(hostinfo['mem_total']['stdout'])/1024/1024,2)
 		hostinfo['mem_free'] = shell.get_result_dict("""cat /proc/meminfo | awk  '{ if ( $1 == "MemFree:") print $2}'""")
@@ -37,6 +37,7 @@ class inspection:
 		hostinfo['mem_available'] = shell.get_result_dict("""cat /proc/meminfo | awk  '{ if ( $1 == "MemAvailable:") print $2}'""") #centos 6.5等版本无此选项 可以内存计算较为复杂, 后续版本再考虑是否计算
 		hostinfo['mem_available']['stdout'] = round(int(hostinfo['mem_available']['stdout'])/1024/1024,2)
 
+		#swappiness建议为1,  MYSQL要尽可能的使用内存, 但是又不能宕掉...
 		hostinfo["swappiness"] = shell.get_result_dict("cat /proc/sys/vm/swappiness")
 		hostinfo['swap_total'] = shell.get_result_dict("""cat /proc/meminfo | awk  '{ if ( $1 == "SwapTotal:") print $2}'""")
 		hostinfo['swap_total']['stdout'] = round(int(hostinfo['swap_total']['stdout'])/1024/1024,2)
@@ -71,10 +72,12 @@ class inspection:
 				dirname = str(self.global_variables['datadir'].tail(1)[0]) + "/" + dirname
 			#hostinfo[x] = shell.get_result_dict("df -PT {dirname} | tail -n +2".format(dirname=dirname))
 			dirf = shell.get_result_dict("df -PT {dirname} | tail -n +2".format(dirname=dirname))
+			dir_size = shell.get_result_dict("du -sh %s | awk '{print $1}'" %(dirname))
 			dirf['stdout'] = dirf['stdout'].split()
 			dirf['stdout'][2] = round(int(dirf['stdout'][2])/1024/1024,1)
 			dirf['stdout'][3] = round(int(dirf['stdout'][3])/1024/1024,1)
 			dirf['stdout'][4] = round(int(dirf['stdout'][4])/1024/1024,1)
+			dirf['other'] = dir_size
 			hostinfo[x] = dirf
 
 

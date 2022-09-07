@@ -1,0 +1,468 @@
+#MYSQL内存建议为 Max_used_connections*mem_per_user + global_mem  再乘上 1.1 
+
+
+#1资源
+#2安全与稳定
+#3集群与高可用
+#4性能与规范
+#5参数
+#6其它
+
+INSPECTION:
+  - object_name : 'no_primary_key' #此巡检项的名字 和 函数名字完全对应
+    des : '无主键的表'
+    sql : "SELECT      aa.TABLE_SCHEMA, aa.TABLE_NAME FROM     (SELECT          TABLE_SCHEMA, TABLE_NAME     FROM
+ INFORMATION_SCHEMA.TABLES     WHERE         TABLE_SCHEMA NOT IN ('sys','information_schema','mysql','performance_schema')) AS aa
+ LEFT JOIN     (SELECT          TABLE_SCHEMA, TABLE_NAME     FROM         INFORMATION_SCHEMA.TABLE_CONSTRAINTS     WHERE                CONSTRAINT_TYPE = 'PRIMARY KEY'             ) AS bb ON aa.TABLE_SCHEMA = bb.TABLE_SCHEMA         AND aa.TABLE_NAME = bb.TABLE_NAME WHERE
+   bb.TABLE_NAME IS NULL;" 
+    enabled : True
+    score : 5
+    type : 4
+    opt : 0  # 0 >=  1 >  2 <=  3 <  4 in  5 not in #仅参考, 不是只用这些
+    suggestion : '建议每张表都设置主键' #优先级低于level里面具体的
+    level : 
+      - level : 3
+        condition : {'count':5,}
+        des : '无主键的表较多'
+        suggestion : '建议每张表都设置主键'
+      - level : 4
+        condition : {'count':20,}
+        des : '无主键的表很多'
+        suggestion : '建议每张表都设置主键'
+
+  - object_name : 'redundant_indexes' #冗余索引
+    des : '冗余索引'
+    sql : "select table_schema,table_name,redundant_index_name,redundant_index_columns,dominant_index_name,dominant_index_columns,sql_drop_index from sys.schema_redundant_indexes"
+    enabled : True #默认为True
+    score : 2
+    type : 4
+    opt : 0
+    suggestion : '建议删掉冗余索引'
+    level : [{'level':3, 'condition':{'count':5,}, 'des':'冗余索引较多'},  {'level':4, 'condition':{'count':50,}, 'des':'冗余索过多'},]
+
+  - object_name : 'unused_indexes'
+    des : '未使用的索引'
+    sql : 'select * from sys.schema_unused_indexes;'
+    score : 2
+    type : 1
+    opt : 0
+    suggestion : '建议删掉长时间未使用的索引(仅供建议)'
+    level : [{'level':2, 'condition':{'count':10,},}, {'level':3, 'condition':{'count':120,},},]
+  
+  - object_name : 'full_table_scans'
+    des : '全表扫描的表' #默认只查看的0.5天内的
+    sql : 'select * from sys.statements_with_full_table_scans where last_seen < DATE_SUB(current_timestamp(), INTERVAL 0.5 DAY)'
+    score : 1
+    type : 2
+    opt : 0
+    suggestion : '尽量避免全表扫描'
+    level : [{'level':2, 'condition':{'count':100,}}, {'level':3, 'condition':{'count':1000,},}]
+
+  - object_name : 'auto_increment_columns'
+    des : '自增键使用率'
+    sql : 'select * from sys.schema_auto_increment_columns where auto_increment_ratio > 0.80;' #使用率超过80%的
+    score : 1
+    type : 4
+    opt : 0
+    suggestion : ''
+    level : [{'level':2, 'condition':{'count':1,}}, {'level':3, 'condition':{'count':5,},}]
+
+  - object_name : 'special_column'
+    des : '特殊字段'
+    sql : "select TABLE_SCHEMA,TABLE_NAME,COLUMN_NAME,COLUMN_TYPE from information_schema.columns where COLUMN_TYPE in ('longblob','blob','mediumtext','mediumblob','text') and TABLE_SCHEMA not in ('sys','information_schema','mysql','performance_schema');"
+    score : 1
+    type : 4
+    opt : 0
+    suggestion : '建议不要使用特殊字段(大字段)'
+    level : [{'level':2, 'condition':{'count':10,}}, {'level':3, 'condition':{'count':100,},}]
+
+  - object_name : 'big_table'
+    des : '大表'
+    sql : "select TABLE_SCHEMA,TABLE_NAME,ENGINE,TABLE_ROWS,DATA_LENGTH from information_schema.tables where TABLE_ROWS > 10000000 and DATA_LENGTH > 32212254720;"
+    score : 2
+    type : 4
+    opt : 0
+    suggestion : ''
+    level : [{'level':2, 'condition':{'count':10,}}, {'level':3, 'condition':{'count':100,},}]
+
+  - object_name : 'cold_table'
+    des : '冷表'
+    sql : "select TABLE_SCHEMA,TABLE_NAME,ENGINE,UPDATE_TIME from information_schema.tables where UPDATE_TIME < DATE_SUB(current_timestamp(), INTERVAL 90 DAY) and TABLE_SCHEMA not in ('sys','information_schema','mysql','performance_schema');"
+    score : 2
+    type : 4
+    opt : 0
+    suggestion : '建议归档冷表'
+    level : [{'level':2, 'condition':{'count':10,}}, {'level':4, 'condition':{'count':100,},}]
+
+  - object_name : 'partition_table'
+    des : '分区表'
+    sql : "select * from (select TABLE_SCHEMA,TABLE_NAME,count(PARTITION_NAME) as count from information_schema.PARTITIONS where table_schema not in ('sys','information_schema','mysql','performance_schema') group by TABLE_SCHEMA,TABLE_NAME) as aa where aa.count > 0;"
+    score : 1
+    type : 4
+    opt : 0
+    suggestion : ''
+    level : [{'level':2, 'condition':{'count':5,}}, {'level':3, 'condition':{'count':20,},}]
+
+  - object_name : 'is_nullable'
+    des : '可为空的字段'
+    sql : "select TABLE_SCHEMA,TABLE_NAME,COLUMN_NAME,IS_NULLABLE from information_schema.columns where IS_NULLABLE='YES' and table_schema not in ('sys','information_schema','mysql','performance_schema');"
+    score : 1
+    type : 4
+    opt : 0
+    suggestion : '建议不要使用可为空的字段'
+    level : [{'level':2, 'condition':{'count':10,}}, {'level':3, 'condition':{'count':40,},}]
+
+  - object_name : 'no_innodb_table'
+    des : '非innodb表'
+    sql : "select TABLE_SCHEMA,TABLE_NAME,ENGINE from information_schema.tables where ENGINE != 'InnoDB' and TABLE_SCHEMA not in ('sys','information_schema','mysql','performance_schema');"
+    score : 2
+    type : 4
+    opt : 0
+    suggestion : '建议使用InnoDB的表(仅供建议,请以实际需求为主)'
+    level : [{'level':2, 'condition':{'count':2,}}, {'level':3, 'condition':{'count':10,},}, {'level':4, 'condition':{'count':20,},},]
+
+  - object_name : 'table_static_expired'
+    des : '统计信息过期的表(长时间未更新统计信息)'
+    sql : "select * from mysql.innodb_table_stats where last_update < DATE_SUB(current_timestamp(), INTERVAL 90 DAY) and database_name not in ('sys','information_schema','mysql','performance_schema');"
+    score : 1
+    type : 6
+    opt : 0
+    suggestion : '建议手动更新统计信息(analyze table table_name)'
+    level : [{'level':2, 'condition':{'count':5,}}, {'level':3, 'condition':{'count':10,},}]
+
+  - object_name : 'fragment_table'
+    des : '碎片表'
+    sql : "select * from (select TABLE_SCHEMA,TABLE_NAME,DATA_LENGTH,DATA_FREE,round(DATA_FREE/(DATA_LENGTH+DATA_FREE)*100,2) as fragment_rate from information_schema.tables where DATA_LENGTH>0 and TABLE_SCHEMA not in ('sys','information_schema','mysql','performance_schema')) as aa where aa.fragment_rate > 40;"
+    score : 3
+    type : 1
+    opt : 0
+    suggestion : '建议清理碎片表(比如导出再导入)'
+    level : [{'level':2, 'condition':{'count':5,}}, {'level':4, 'condition':{'count':20,},}]
+
+  - object_name : 'same_user_password'
+    des : '用户名和密码相同的账号'
+    sql : "SELECT CONCAT(user, '@', host) as account FROM mysql.user where authentication_string = CONCAT('*', UPPER(SHA1(UNHEX(SHA1(user)))))"
+    score : 2
+    type : 2
+    opt : 0
+    suggestion : '账号密码一样不安全, 建议整个复杂点的密码'
+    level : [{'level':3, 'condition':{'count':1,}}, {'level':4, 'condition':{'count':5,},}]
+
+  - object_name : 'expired_password'
+    des : '密码过期的用户'
+    sql : "SELECT CONCAT(user, '@', host) as account from mysql.user where password_expired='Y';"
+    score : 1
+    type : 2
+    opt : 0
+    suggestion : '部分账号密码过期了,请注意及时修改'
+    level : [{'level':2, 'condition':{'count':1,}}, {'level':3, 'condition':{'count':5,},}]
+
+  - object_name : 'any_host'
+    des : '未限制访问IP的账号'
+    sql : "SELECT CONCAT(user, '@', host) as account FROM mysql.user where host = '%';"
+    score : 1
+    type : 2
+    opt : 0
+    suggestion : '建议限制用户访问的网段(host尽量不要用%)'
+    level : [{'level':2, 'condition':{'count':1,}}, {'level':3, 'condition':{'count':10,},}]
+
+  - object_name : 'simple_password'
+    des : '密码简单的用户' #使用密码字典爆破 , 脚本采集数据不支持此巡检项
+    enable : True #若有审计设备之类的安全设备, 不建议启用此巡检项
+    sql : "select 1;"
+    score : 3
+    type : 2
+    opt : 0
+    suggestion : '密码太简单了(密码字典包含的密码), 建议设置复杂的密码'
+    level : [{'level':2, 'condition':{'count':1,}}, {'level':3, 'condition':{'count':10,},}]
+
+  - object_name : 'innodb_buffer_stats_by_schema'
+    des : '各库内存使用情况'
+    sql : "select * from sys.innodb_buffer_stats_by_schema;"
+    score : 0
+    type : 6
+    opt : 0
+    suggestion : ''
+    level : []
+
+  - object_name : 'schema_object_overview'
+    des : '各库对象情况'
+    sql : "select * from sys.schema_object_overview;"
+    score : 0
+    type : 6
+    opt : 0
+    suggestion : ''
+    level : []
+
+  - object_name : 'memory_global_by_current_bytes'
+    des : '各事件内存使用'
+    sql : "select * from sys.memory_global_by_current_bytes;"
+    score : 0
+    type : 6
+    opt : 0
+    suggestion : ''
+    level : []
+
+  - object_name : 'io_global_by_wait_by_latency'
+    des : '全局IO延迟'
+    sql : "select * from sys.io_global_by_wait_by_latency;"
+    score : 0
+    type : 6
+    opt : 0
+    suggestion : ''
+    level : []
+
+  - object_name : 'waits_global_by_latency'
+    des : '全局等待事件'
+    sql : "select * from sys.waits_global_by_latency;"
+    score : 0
+    type : 6
+    opt : 0
+    suggestion : ''
+    level : []
+
+  - object_name : 'schema_table_lock_waits'
+    des : '显示哪些会话在等待元数据锁时被阻塞'
+    sql : "select object_name,waiting_pid,waiting_query,blocking_pid,blocking_account,sql_kill_blocking_query from sys.schema_table_lock_waits;"
+    score : 1
+    type : 2
+    opt : 0
+    suggestion : ''
+    level : [{'level':2, 'condition':{'count':1,}}, {'level':3, 'condition':{'count':5,},}]
+
+  - object_name : 'innodb_lock_waits'
+    des : 'innodb锁等待'
+    sql : "select locked_table,waiting_pid,waiting_query,blocking_pid,blocking_query,sql_kill_blocking_query from sys.innodb_lock_waits;"
+    score : 1
+    type : 6
+    opt : 0
+    suggestion : ''
+    level : [{'level':3, 'condition':{'count':1,}}, {'level':4, 'condition':{'count':5,},}]
+
+  - object_name : 'master_info'
+    des : '主库相关信息(master info)'
+    sql : "select * from information_schema.processlist where COMMAND = 'Binlog Dump';"
+    score : 0
+    type : 3
+    opt : 0
+    suggestion : ''
+    level : []
+
+  - object_name : 'slave_info'
+    des : '从库相关信息(slave info)'
+    sql : 'select 1;'
+    score : 5
+    type : 3
+    opt : 0
+    suggestion : '请查看主从信息'
+    level : [{'level':1, 'condition':{'value':['Yes'],}}, {'level':3, 'condition':{'value':['Connecting']},}, {'level':4, 'condition':{'value':['No']},},]
+
+  - object_name : 'pxc_info'
+    des : 'PXC集群相关'
+    enabled : True 
+    sql : 'select 1;'
+    score : 5
+    type : 3
+    opt : 0
+    suggestion : '请查看PXC信息'
+    level : [{'level':1, 'condition':{'value':['ON'],}}, {'level':4, 'condition':{'value':['OFF']},},]
+
+  - object_name : 'mgr_info'
+    des : 'MGR集群相关'
+    enabled : True
+    sql : 'select 1;'
+    score : 5
+    type : 3
+    opt : 0
+    suggestion : '请查看MGR信息'
+    level : [{'level':1, 'condition':{'value':['ONLINE'],}}, {'level':2, 'condition':{'value':['RECOVERING']},}, {'level':3, 'condition':{'value':['UNREACHABLE']},}, {'level':4, 'condition':{'value':['OFFLINE','ERROR'],}},]
+
+  - object_name : 'log_bin'
+    des : '是否启用binlog'
+    sql : 'select @@log_bin;' 
+    score : 3
+    type : 5
+    opt : 0
+    suggestion : '建议开启binlog'
+    level : [{'level':1, 'condition':{'value':['ON'],}}, {'level':4, 'condition':{'value':['OFF'],},}]
+
+  - object_name : 'default_storage_engine'
+    des : '默认存储引擎'
+    sql : 'select @@default_storage_engine;' 
+    score : 2
+    type : 5
+    opt : 0
+    suggestion : '建议设置默认存储引擎为InnoDB'
+    level : [{'level':1, 'condition':{'value':['InnoDB'],}}, ]
+
+  - object_name : 'innodb_flush_log_at_trx_commit'
+    des : '刷redo log策略(双1)'
+    sql : 'select @@innodb_flush_log_at_trx_commit;' 
+    score : 4
+    type : 5
+    opt : 0
+    suggestion : '建议设置innodb_flush_log_at_trx_commit=1'
+    level : [{'level':1, 'condition':{'value':['1'],}}, ]
+
+  - object_name : 'sync_binlog'
+    des : '刷binlog策略(双1)'
+    sql : 'select @@innodb_flush_log_at_trx_commit;' 
+    score : 4
+    type : 5
+    opt : 0
+    suggestion : '建议设置sync_binlog=1'
+    level : [{'level':1, 'condition':{'value':['1'],}}, ]
+
+  - object_name : 'general_log'
+    des : '通用日志(记录所有操作)'
+    sql : 'select @@general_log;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议关闭general_log'
+    level : [{'level':1, 'condition':{'value':['0'],}}, ]
+
+  - object_name : 'slow_query_log'
+    des : '慢日志'
+    sql : 'select @@slow_query_log;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议开启慢日志记录'
+    level : [{'level':1, 'condition':{'value':['1'],}}, ]
+
+  - object_name : 'transaction_isolation'
+    des : '事务隔离级别'
+    sql : 'select @@transaction_isolation;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议设置RR/RC'
+    level : [{'level':1, 'condition':{'value':['REPEATABLE-READ','READ-COMMITTED'],}}, ]
+
+  - object_name : 'innodb_buffer_pool_size'
+    des : 'innodb缓存大小' #不含innodb_buffer_pool_instances
+    sql : 'select @@innodb_buffer_pool_size;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : 'innodb_buffer_pool_size建议大于1GB. 如果是独立的MYSQL数据库服务器, 可以设置内存 60%-80%物理内存'
+    level : [{'level':1, 'condition':{'min':1073741824,}}, ]
+
+  - object_name : 'server_id'
+    des : 'server_id(范围 0-2^server_id_bits)' 
+    sql : 'select @@server_id;' 
+    score : 0
+    type : 5
+    opt : 0
+    suggestion : ''
+    level : []
+
+  - object_name : 'innodb_log_file_size'
+    des : 'redo日志文件大小'
+    sql : 'select @@innodb_log_file_size;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议大于512M, 比如1GB'
+    level : [{'level':1, 'condition':{'min':536870912}}, ]
+
+  - object_name : 'innodb_log_files_in_group'
+    des : 'redo日志文件数量'
+    sql : 'select @@innodb_log_files_in_group;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议最少4个一组'
+    level : [{'level':1, 'condition':{'min':4,}}, ]
+
+  - object_name : 'innodb_page_size'
+    des : 'innodb页大小'
+    sql : 'select @@innodb_page_size;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议16K(默认), 请以实际业务需求为主'
+    level : [{'level':1, 'condition':{'value':['16384'],}}, ]
+
+  - object_name : 'innodb_doublewrite'
+    des : '双写区(虽然数据被写入两次,但双写缓冲区不需要两倍的I/O开销)'
+    sql : 'select @@innodb_doublewrite;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议开启双写'
+    level : [{'level':1, 'condition':{'value':['1'],}}, ]
+
+  - object_name : 'gtid_mode'
+    des : 'gtid'
+    sql : 'select @@gtid_mode;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议设置开启gtid'
+    level : [{'level':1, 'condition':{'value':['ON','ON_PERMISSIVE'],}}, ]
+
+  - object_name : 'performance_schema'
+    des : 'performance_schema'
+    sql : 'select @@performance_schema;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议开启performance_schema'
+    level : [{'level':1, 'condition':{'value':['1',],}}, ]
+
+  - object_name : 'binlog_format'
+    des : 'binlog格式'
+    sql : 'select @@binlog_format;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议设置binlog格式为row'
+    level : [{'level':1, 'condition':{'value':['ROW',],}}, ]
+
+  - object_name : 'binlog_row_image'
+    des : 'binlog行记录方式'
+    sql : 'select @@binlog_row_image;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议记录完整的数据行(变更前后的数据), 也就是设置binlog_row_image=full'
+    level : [{'level':1, 'condition':{'value':['FULL',],}}, ]
+
+  - object_name : 'max_connections'
+    des : '最大连接数' #后续根据Max_used_connections来计算
+    sql : 'select @@max_connections;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议大于1024(仅供参考, 请根据实际业务设置)'
+    level : [{'level':1, 'condition':{'min':1024}}, ]
+
+  - object_name : 'innodb_io_capacity'
+    des : '数据库IO' #后续根据磁盘类型来计算
+    sql : 'select @@innodb_io_capacity;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议大于2500'
+    level : [{'level':1, 'condition':{'min':2500}}, ]
+
+  - object_name : 'innodb_io_capacity_max'
+    des : '数据库最大IO' 
+    sql : 'select @@innodb_io_capacity_max;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议大于5000'
+    level : [{'level':1, 'condition':{'min':5000}}, ]
+
+  - object_name : 'innodb_log_buffer_size'
+    des : 'redo缓存大小' 
+    sql : 'select @@innodb_log_buffer_size;' 
+    score : 1
+    type : 5
+    opt : 0
+    suggestion : '建议大于64MB'
+    level : [{'level':1, 'condition':{'min':67108864}}, ]
+

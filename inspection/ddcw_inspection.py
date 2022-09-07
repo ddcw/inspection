@@ -10,13 +10,36 @@ from . import log
 from . import mysql_shell_conn
 from . import format_mf
 from . import coll_ana_data
-def inspection(q,c,logfile,d,taskname):
-	l = log.log(logfile=logfile, format_log="[{taskname}] [{osid}]".format(osid=os.getpid(), taskname=taskname))
+def inspection(q,c,logfile,task_detail,taskid):
+	l = log.log(logfile=logfile, format_log="[{taskid}] [{osid}]".format(osid=os.getpid(), taskid=taskid))
 	l.info("PID:{pid} BEGIN".format(pid=os.getpid()))
+	
+	global d
+	d = {}
+	global taskname
+	def message(*args):
+		global d
+		try:
+			msg = args[0]
+		except:
+			msg = ''
+		try:
+			level = args[1]
+		except:
+			level = 0
+		d['running'] = msg
+		task_detail[taskname] = d
+		if level == 0:
+			l.info(msg)
+		elif level == 1:
+			l.warning(msg)
+		else:
+			l.error(msg)
 	while True:
 		try:
 			instance = q.get(block=False,timeout=10) #最多等10秒, 超过了就不管了
 			time.sleep(1)
+			d = {}
 			#print(os.getpid(),"开始巡检    ",instance['port'])
 		except:
 			time.sleep(2)
@@ -24,12 +47,17 @@ def inspection(q,c,logfile,d,taskname):
 			l.info("PID:{pid} END".format(pid=os.getpid()))
 			break
 
+
 		#初始化日志, 记录每个实例的host和port
-		l.format_log2("[{taskname}] [{osid}] {host}:{port}".format(osid=os.getpid(), taskname=taskname, host=instance['host'],port=instance['port']))
+		l.format_log2("[{taskid}] [{osid}] {host}:{port}".format(osid=os.getpid(), taskid=taskid, host=instance['host'],port=instance['port']))
 
 		#初始化d
+		taskname = "{host}_{port}_{time}".format(host=instance['host'],port=instance['port'],time=int(time.time()))
+
+		d['taskname'] = taskname
+		d['taskid'] = taskid
 		d['pid'] = os.getpid()
-		d["type"] = c['GLOBAL']['Type']
+		#d["type"] = c['GLOBAL']['Type'] #移除Type
 		d["host"] = instance['host']
 		d["port"] = instance['port']
 		d["user"] = instance['user']
@@ -38,46 +66,30 @@ def inspection(q,c,logfile,d,taskname):
 		d['stat'] = 1
 		d['running'] = "init"
 		d['result'] = ""
-		d['task_name'] = taskname
 		d['score'] = 0
-		#d['task_detail_name'] = "{host}_{port}_{time}".format(host=instance['host'],port=instance['port'],time=d['begin_time'])
-		d['task_detail_name'] = "{host}_{port}_{time}".format(host=instance['host'],port=instance['port'],time=int(time.time()))
-		#print(d['task_detail_name'])
-
+		d['data1'] = ""
+		d['data'] = ""
+		d['node_relation'] = ""
 
 		#校验数据库账号密码, 并生成连接信息
 		instancef = format_mf.formatc(instance) #格式化, 把没得的对象补齐.
 		cmysql = mysql_shell_conn.mysql(instancef)
-		d['running'] = "连接mysql中..."
-		l.info("连接mysql中...")
+		message('连接mysql中... from NEW MSG')
 		if cmysql.status():
 			conn = cmysql.conn()
-			#cursor = conn.cursor()
-			#cursor.execute("show databases");
-			#data1 = cursor.fetchall()
-			#print(data1)
 		else:
-			l.error("连接失败 {error}".format(error=cmysql.error))
+			#l.error("连接失败 {error}".format(error=cmysql.error))
 			d['stat'] = 3
 			d['end_time'] = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
 			d['running'] = "FAILED. See the log for details ({logfile})".format(logfile=logfile)
-			#sys.exit(1)
-			time.sleep(1)
-			continue #巡检失败之后应该去队列里面找剩下的工作..... 但我允许休息1秒
-
-		#采集主机信息, 最后才做的事情, 先写好而已
-	#	d['running'] = "连接shell中..."
-	#	if cshell.status():
-	#		shell = cshell.conn()
-	#	else:
-	#		l.warning("无法巡检主机信息(自动跳过). {error}".format(error=cshell.error))
+			message("连接失败 {error} FAILED. See the log for details ({logfile})".format(error=cmysql.error,logfile=logfile))
+			continue #巡检失败之后应该去队列里面找剩下的工作.....
 
 
 		#定义初始化信息采集结果
 		result = {}
 
-		d['running'] = "初始化固定采集信息..."
-		l.info("开始采集固定信息(variables, status等)")
+		message('开始采集固定信息(variables, status等)')
 		#init() #获取固定采集数据
 		initdata = coll_ana_data.init_data(conn)
 		result['global_variables'] = initdata.global_variables()
@@ -87,8 +99,7 @@ def inspection(q,c,logfile,d,taskname):
 		result['statement_analysis'] = initdata.statement_analysis()
 
 		#收集global status
-		d['running'] = "采集global status 预计 {s} 秒...".format(s=c['GLOBAL']['Data_collection_time'])
-		l.info("采集global status 预计 {s} 秒...".format(s=c['GLOBAL']['Data_collection_time']))
+		message("采集global status 预计 {s} 秒...".format(s=c['GLOBAL']['Data_collection_time']))
 		global_status_runtime = int(c['GLOBAL']['Data_collection_interval']) 
 		time_col_0 = []
 		global_status = initdata.global_status()['data']
@@ -106,8 +117,9 @@ def inspection(q,c,logfile,d,taskname):
 		result['global_status'] = {"status":True,"data":global_status}
 		#print(result['global_status']['data'][['time_col_0','Uptime']])
 
-		d['running'] = "global status采集完成, 即将开始巡检"
-		l.info("global status采集完成, 即将开始巡检")
+		#d['running'] = "global status采集完成, 即将开始巡检"
+		#l.info("global status采集完成, 即将开始巡检")
+		message("global status采集完成, 即将开始巡检")
 
 		#开始巡检
 		#定义巡检保存结果在data里面
@@ -131,12 +143,14 @@ def inspection(q,c,logfile,d,taskname):
 			try:
 				abcdefg = x['Enabled'] 
 			except Exception as e:
-				l.info("自动启动巡检项 {f}".format(f=x['Object_name'],))
+				#l.info("自动启动巡检项 {f}".format(f=x['Object_name'],))
+				message("自动启动巡检项 {f}".format(f=x['Object_name'],))
 				x['Enabled'] = True
 			if x['Enabled']:
 				inspection_n += 1
-				d["running"] = "巡检 {f}".format(f=x['Object_name'],)
-				l.info("巡检 {f}".format(f=x['Object_name'],))
+				#d["running"] = "巡检 {f}".format(f=x['Object_name'],)
+				#l.info("巡检 {f}".format(f=x['Object_name'],))
+				message("巡检 {f}".format(f=x['Object_name'],))
 				execcmd = "data['{f}'] = colldata.{f}(x)".format(f=x['Object_name'],)
 				exec(execcmd)
 				data[x['Object_name']]['old_score'] = x['Score']
@@ -144,7 +158,8 @@ def inspection(q,c,logfile,d,taskname):
 				data[x['Object_name']]['t1'] = x['Type']
 				data[x['Object_name']]['enabled'] = x['Enabled']
 				if data[x['Object_name']]['status']:
-					d["running"] = "{f} OK".format(f=x['Object_name'],)
+					#d["running"] = "{f} OK".format(f=x['Object_name'],)
+					message("{f} OK".format(f=x['Object_name'],))
 					total_score += x['Score']
 					get_score += data[x['Object_name']]['score']
 					success_inspection_n += 1
@@ -155,15 +170,17 @@ def inspection(q,c,logfile,d,taskname):
 					else:
 						inspection_normal += 1
 				else:
-					d["running"] = "{f} FAILED".format(f=x['Object_name'])
-					l.warning(data[x['Object_name']]['data'])
+					#d["running"] = "{f} FAILED".format(f=x['Object_name'])
+					#l.warning(data[x['Object_name']]['data'])
+					message("{f} FAILED".format(f=x['Object_name']), 1)
 				#try:
 				#	total_score += int(x['Score'])
 				#	get_score += int(data[x['Object_name']]['score'])
 				#except Exception as e:
 				#	l.warning(e)
 			else:
-				l.warning("忽略巡检项:{f} ".format(f=x['Object_name']))
+				#l.warning("忽略巡检项:{f} ".format(f=x['Object_name']))
+				message("忽略巡检项:{f} ".format(f=x['Object_name']))
 				continue
 
 		#print(data['redundant_indexes'])
@@ -339,7 +356,7 @@ def inspection(q,c,logfile,d,taskname):
 
 		#根据巡检结果生成巡检报告
 		report_result = ""
-		report_filename = "{host}_{port}_{taskname}".format(host=instance['host'],port=instance['port'],taskname=taskname) #不含后缀
+		report_filename = "{host}_{port}_{taskid}".format(host=instance['host'],port=instance['port'],taskid=taskid) #不含后缀
 		if c['GLOBAL']['Type'] == "html":
 			from . import report_html
 			report_result = report_html.get_result(data,data1,c,report_filename,data2)
@@ -357,13 +374,15 @@ def inspection(q,c,logfile,d,taskname):
 
 
 		d['stat'] = 2
-		d['result'] = report_result
+		#d['result'] = report_result
+		d['result'] = os.path.basename(report_result)
 		#break
 		conn.close() #关闭mysql连接 每个实例
 		d['running'] = "巡检完成"
 		d['end_time'] = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
 		d['score'] = data1['score_percent']
 		l.info("巡检完成")
+		message('巡检完成',)
 
 		#下一次初始化前, 等待监控线程同步完信息..
 		time.sleep(2)

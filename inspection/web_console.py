@@ -2,63 +2,103 @@ import yaml
 import sys,os
 import time
 from multiprocessing import Process, Manager, Queue
-from . import ddcw_inspection
+#from . import ddcw_inspection
 from threading import Thread 
+from gevent import pywsgi
+
+from inspection import manager_inspection
+from inspection import hashstr
+from inspection import work_inspection
+from inspection import work_relation
+
+
 
 class web_inspection:
 	def __init__(self,parser):
 		conf_file = parser.CONF_FILE
 		try:
-			inf = open(conf_file, 'r', encoding="utf-8")
-			inf_data =  inf.read()
-			inf.close()
+			with open(conf_file, 'r', encoding="utf-8") as f:
+				inf_data =  f.read()
 			conf = yaml.load(inf_data,Loader=yaml.Loader)
 		except Exception as e:
 			print(e)
 			sys.exit(1)
 
-		self.host = conf['GLOBAL']['Web_host']
-		self.port = int(conf['GLOBAL']['Web_port'])
+
+		#是否启动WEB. 如果可以连上manager就不启动web
+		_INNER_ENABLE_WEB = True
+
+		self.host = conf['WEB']['host']
+		self.port = int(conf['WEB']['port'])
 		self.c = conf
 
+		manager_host = conf['MANAGER']['host']
+		manager_port = int(conf['MANAGER']['port'])
+		manager_authkey = hashstr.hash1(conf['MANAGER']['authkey'])
 
-	def init_history_task(self,tmp_dir):
-		c = self.c
-		task = {}
-		task_detail = {}
-		for x in os.listdir(tmp_dir):
+		#初始化task
+		inspection_instance = manager_inspection.inspection()
+
+		#初始化manager
+		manager_instance = manager_inspection.task_manager()
+		if manager_instance.test_conn(manager_host,manager_port,manager_authkey):
+			_INNER_ENABLE_WEB = False
+			print('已连接manager.... 不会启动web')
+			#pass
+		else:
 			try:
-				#注: 若主机名含_task_ 则解析失败
-				hostport = x.split('_task_')[0]
-				host = hostport.split('_')[0]
-				port = hostport.split('_')[1]
-				taskname = str(c['GLOBAL']['History_task_pre']) + str(x.split('_task_')[1].split('.')[0])
-				taskdetailname = str(hostport) + '_' + taskname
-				if taskname not in task:
-					task[taskname] = {}
-					task[taskname]['jindu'] = [0,0]
-					task[taskname]['detail'] = []
-				task[taskname]['detail'].append(taskdetailname)
-				task_detail[taskdetailname] = {}
-				task_detail[taskdetailname]['host'] = host
-				task_detail[taskdetailname]['port'] = port
-				task_detail[taskdetailname]['begin_time'] = ''
-				task_detail[taskdetailname]['end_time'] = ''
-				task_detail[taskdetailname]['score'] = 0
-				task_detail[taskdetailname]['stat'] = 2
-				task_detail[taskdetailname]['running'] = '已完成'
-				task_detail[taskdetailname]['result'] = x
+				#manager_instance.start(manager_host,manager_port,manager_authkey,inspection_instance)
+				manager_process = Process(target=manager_instance.start, args=(manager_host,manager_port,manager_authkey,inspection_instance),)
+				manager_process.start()
 			except Exception as e:
-				#print(e)
-				continue
-		#print(task)
-		return task,task_detail
+				print(e)
+				sys.exit(1)
 
+		self.manager_host = manager_host
+		self.manager_port = manager_port
+		self.manager_authkey = manager_authkey
+
+		#启动work进程(非阻塞方式)
+		PARALLEL = int(conf['OTHER']['parallel'])
+		thread_list = {}
+		for p in range(0,PARALLEL):
+			thread_list[p] = Process(target=work_inspection.inspection, kwargs={'conf':self.c},)
+		for p in range(0,PARALLEL):
+			thread_list[p].start()
+			#print(p,' start')
+		
+		#启动relation_work进程
+		relation_work = Process(target=work_relation.relation, kwargs={'conf':self.c})
+		relation_work.start()
+
+
+		#本机连上manager
+		manager_instance = manager_inspection.task_manager()
+		m = manager_instance.conn(manager_host,manager_port,manager_authkey)
+		q = m.task_queue() #将要巡检的队列
+		queue_relation = m.queue_relation() #将要巡检的队列
+		inspection_task = m.inspection() #task相关的信息
+		self.q = q
+		self.inspection_task = inspection_task
+		self.queue_relation = queue_relation
+
+		self._INNER_ENABLE_WEB = _INNER_ENABLE_WEB
+
+
+
+	def relation_analyze(data):
+		return {'status':True,'data':''}
 
 
 	def run(self,*args,**kwargs):
+		if not self._INNER_ENABLE_WEB:
+			return True
 		c = self.c
-		Tmp_dir = c['GLOBAL']['Tmp_dir']
+		Tmp_dir = c['OTHER']['report_dir']
+		inspection_file = c['OTHER']['inspection']
+		with open(inspection_file, 'r', encoding="utf-8") as f:
+				inf_data =  f.read()
+		inspection_conf = yaml.load(inf_data,Loader=yaml.Loader)
 		from flask import url_for,Flask,request,redirect,send_file, render_template
 		import pandas as pd
 		static_dir = str(os.getcwd()) + "/static"
@@ -66,15 +106,6 @@ class web_inspection:
 		app = Flask(__name__, static_folder=static_dir, template_folder=template_dir )
 		app.config['JSON_AS_ASCII'] = False #返回中文问题
 		#app = Flask(__name__, )
-		global task
-		task = {}
-		global task_detail
-		task_detail = {}
-
-		if c['GLOBAL']['History_task']:
-			task,task_detail = self.init_history_task(c['GLOBAL']['Tmp_dir'])
-		#print(task)
-		#task_detail['test_task'] = {"running":"XXXXXXX"}
 		@app.route('/')
 		def index():
 			print(os.getcwd())
@@ -83,72 +114,8 @@ class web_inspection:
 
 		@app.route('/inspection_web', methods=['POST'])
 		def inspection_web():
-			#global task,task_detail
-			def display_state(d,):
-				success_task_detail_list = [] #初始化巡检完成的队列
-				task_detail_name = ''
-				while True:
-					try:
-						task_detail_name = d['task_detail_name']
-						task_name = d['task_name']
-						task[task_name]['detail'].append(task_detail_name) #把这个task_detail注册到task中
-						task_detail[task_detail_name] = {}
-						task_detail[task_detail_name]['running'] = d['running'] #初始化task_detail
-						break
-					except Exception as e:
-						time.sleep(0.01)
-				while True:
-					if d['stat'] == 99:
-						#这个work线程完成了
-						break 
-					try:
-						task_detail_name = d['task_detail_name']
-						task_detail[task_detail_name]['running'] = d['running']
-						task_detail[task_detail_name]['pid'] = d['pid']
-						task_detail[task_detail_name]['host'] = d['host']
-						task_detail[task_detail_name]['port'] = d['port']
-						task_detail[task_detail_name]['begin_time'] = d['begin_time']
-						task_detail[task_detail_name]['end_time'] = d['end_time']
-						task_detail[task_detail_name]['stat'] = d['stat']
-						#task_detail[task_detail_name]['result'] = d['result']
-						task_detail[task_detail_name]['result'] = os.path.basename(d['result'])
-						task_detail[task_detail_name]['task_name'] = d['task_name']
-						task_detail[task_detail_name]['task_detail_name'] = d['task_detail_name']
-						task_detail[task_detail_name]['score'] = d['score']
-					except Exception as e:
-						#产生异常就说明是新的一个task_name_detail了 也就是开始巡检另一个实例了
-						task_detail[task_detail_name] = {}
-						task_name = d['task_name']
-						task[task_name]['detail'].append(task_detail_name)
-						continue
-						print(task_detail_name,task_detail,e)
-					if d['stat'] == 2 or d['stat'] == 3:
-						if task_detail_name not in success_task_detail_list:
-							task[task_name]['jindu'][0] += 1 #stat=2 or 3
-							success_task_detail_list.append(task_detail_name)
-
-						#	#等待新的巡检任务开始
-						#	while True:
-						#		task_detail_name = d['task_detail_name']
-						#		if d['stat'] == 99:
-						#			#print("使命结束",d['pid'])
-						#			break
-						#		elif task_detail_name in success_task_detail_list:
-						#			#print("还是旧任务",task_detail_name)
-						#			continue
-						#		else:
-						#			#print("开始新任务了")
-						#			task_name = d['task_name']
-						#			task[task_name]['detail'].append(task_detail_name)
-						#			task_detail[task_detail_name] = {}
-						#			#print(task_detail_name)
-						#			break
-						#		time.sleep(0.01)
-							
-					time.sleep(0.01)
-				
-						
-						
+			q = self.q
+			inspection_task = self.inspection_task
 			try:
 				#inspection_data = request.form['inspection_data']
 				inspection_data = request.get_data()
@@ -156,49 +123,45 @@ class web_inspection:
 				#print(inspection_data,"AAAAAAA")
 				inspection_data_old = eval(inspection_data)
 				inspection_data = inspection_data_old['data']
-				parallel = inspection_data_old['parallel']
-				taskname = "task_{time}".format(time=time.strftime("%Y%m%d_%H%M%S", time.localtime())) #生成一个taskname
-				task[taskname] = {} #格式化这个task
-				task[taskname]['jindu'] = [0,len(inspection_data)]
-				#task[taskname]['jindu'][0] = 0 #当前完成的实例数量
-				#task[taskname]['jindu'][1] = len(inspection_data) #总的实例数量
-				task[taskname]['detail'] = [] #每个实例的详情
+				#inspection_data去重 
+				taskid = "task_{time}".format(time=time.strftime("%Y%m%d_%H%M%S", time.localtime())) #生成一个taskid
+				#task[taskid] = len(inspection_data)
 
-				#print('inspection_data',inspection_data_old)
-				
-				PARALLEL = parallel if parallel < len(inspection_data) else len(inspection_data) #线程数太多没得意义
+				#print(inspection_data)
+				#PARALLEL = parallel if parallel < len(inspection_data) else len(inspection_data) #线程数太多没得意义
 
 				#初始化日志
-				logfile = c["GLOBAL"]["Log_file"]
-				if (logfile is None) or logfile == "":
-					logfile = "logs/task_{time}.log".format(time=time.strftime("%Y%m%d_%H%M%S", time.localtime()))
-				logfile = os.path.abspath(logfile) #格式化为绝对路径
-				logfile_dir = os.path.dirname(logfile)
-				os.makedirs(logfile_dir, exist_ok = True) #创建日志目录
+				#logfile = os.path.abspath(logfile) #格式化为绝对路径
+				#logfile_dir = os.path.dirname(logfile)
+				#os.makedirs(logfile_dir, exist_ok = True) #创建日志目录
 
+			
+				#初始化task信息
+				inspection_task.init_task(taskid)
+				inspection_task.set_task(taskid,'total',len(inspection_data))
 
-				with Manager() as manager:
-					q = manager.Queue(len(inspection_data))
-					for x in inspection_data:
-						q.put(x)
-					thread_list={}
-					dthread_list={}
-					d = {}
-					for p in range(0,PARALLEL):
-						d[p] = manager.dict()
-						d[p]['stat'] = 0
-						d[p]['running'] = "waiting"
-						thread_list[p] = Process(target=ddcw_inspection.inspection, args=(q,c,logfile,d[p], taskname),)
-						#dthread_list[p] = Process(target=display_state, args=(d[p],),)
-						#修改为多线程, 因为多线程共享全局变量.....
-						#thread_list[p] = Thread(target=ddcw_inspection.inspection, args=(q,c,logfile,d[p], taskname),)
-						dthread_list[p] = Thread(target=display_state, args=(d[p],),)
-					for p in range(0,PARALLEL):
-						thread_list[p].start()
-						dthread_list[p].start()
-					for p in range(0,PARALLEL):
-						thread_list[p].join()
-						dthread_list[p].join()
+				#初始化巡检队列
+				for x in inspection_data:
+					x['taskid'] = taskid
+					x['data'] = {'havedata':False,'data':'xxx.xml'}
+					#print(x,'AAAAAAAAAAAAAAAaa')
+					q.put(x)
+
+				#是否监控这个巡检完成? 看后面的需求吧. 目前设计的是 有绘制节点关系的需求就做 比较task[taskid]['total']和task[taskid]['complete']
+				#还是启一个单独的进程去做吧, 这样不影响前端, 加个queue relation
+				if self.c['OTHER']['node_relation']:
+					self.queue_relation.put(taskid)
+				#	while True:
+				#		jindu = inspection_task.get_task_jindu(taskid)
+				#		complete_n = jindu[0]
+				#		total_n = jindu[1]
+				#		if complete_n < total_n:
+				#			time.sleep(3)
+				#		else:
+				#			relation_file = ana_relation.get_relation_csv(taskid,inspection_task,self.c['OTHER']['node_relation_file'])
+				#			inspection_task.set_task(taskid,'relation',relation_file)
+				#			break
+
 			except Exception as e:
 				print(e)
 				return str(e)
@@ -207,20 +170,41 @@ class web_inspection:
 		
 		@app.route('/inspection_status', methods=['POST'])
 		def inspection_status():
-			#global task,task_detail
-			#detail = str(task)+str(task_detail)
-			detail = {"task":task,"task_detail":task_detail}
-			return detail
+			try:
+				inspection_task = self.inspection_task
+				task_list = inspection_task.get_task_all()
+				task_detail_list = inspection_task.get_task_detail_all()
+				return_task_detail = {}
+				for x in task_detail_list:
+					return_task_detail[x] = {}
+					return_task_detail[x]['task_detail_id'] = task_detail_list[x]['task_detail_id']
+					return_task_detail[x]['host'] = task_detail_list[x]['host']
+					return_task_detail[x]['port'] = task_detail_list[x]['port']
+					return_task_detail[x]['begin_time'] = task_detail_list[x]['begin_time']
+					return_task_detail[x]['end_time'] = task_detail_list[x]['end_time']
+					return_task_detail[x]['running'] = task_detail_list[x]['running']
+					return_task_detail[x]['stat'] = task_detail_list[x]['stat']
+					return_task_detail[x]['score'] = task_detail_list[x]['score']
+					return_task_detail[x]['result'] = task_detail_list[x]['result']
+					return_task_detail[x]['task_detail_id'] = task_detail_list[x]['task_detail_id']
+				detail = {'task':task_list,'task_detail':return_task_detail}
+				return detail
+			except:
+				return False
 
 		@app.route('/inspection_item', methods=['POST'])
 		def inspection_item():
-			return {"data":c['INSPECTION']}
+			return {"data":inspection_conf['INSPECTION']}
 
 		
 		@app.route('/inspection_global', methods=['POST'])
 		def inspection_global():
-			global_config = c['GLOBAL']
-			global_config['Web_password'] = '不支持查看'
+			global_config = {}
+			#global_config = {x:c['MYSQL'][x] for x in c['MYSQL']}
+			global_config.update(c['MYSQL'])
+			global_config.update(c['HOST'])
+			global_config.update(c['OTHER'])
+				
 			return {"data":global_config}
 
 		@app.route('/view/<html>')
@@ -242,12 +226,19 @@ class web_inspection:
 				file_type = request.args.get('file_type')
 			except:
 				file_type = "html"
-			file_name = "../" + c['GLOBAL']['Tmp_dir'] + "/" + str(file_name)
+			file_name = "../" + c['OTHER']['report_dir'] + "/" + str(file_name)
 			if file_type == "html":
+				return send_file(file_name,as_attachment=True)
+			elif file_type == "docx":
+				return send_file(file_name,as_attachment=True)
+			elif file_type == "csv":
 				return send_file(file_name,as_attachment=True)
 			else:
 				return "不支持这种文件类型{file_type}下载".format(file_type=file_type)
 				pass
 			return "不支持这种文件类型{file_type}下载".format(file_type=file_type)
 		
-		app.run(host=self.host,  port=self.port, debug=False, )
+		print('http://{host}:{port}'.format(host=self.host, port=self.port))
+		#app.run(host=self.host,  port=self.port, debug=False, )
+		server = pywsgi.WSGIServer((self.host, self.port), app)
+		server.serve_forever()

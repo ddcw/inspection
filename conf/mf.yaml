@@ -1,24 +1,27 @@
 GLOBAL:
-  PARALLEL : 4
-  TEST_ONLY : False
   DEFAULT_HOST : '192.168.101.21'
   DEFAULT_PORT : 3306
   DEFAULT_USER : 'root'
   DEFAULT_PASSWORD : '123456'
-  DEFAULT_SSH_PORT : 22
-  DEFAULT_SSH_USER : 'root'
-  DEFAULT_SSH_PASSWORD : '123456'
+  DEFAULT_SSHPORT : 22
+  DEFAULT_SSHUSER : 'root'
+  DEFAULT_SSHPASSWORD : '123456'
+  DEFAULT_SSHENABLE : True
+  DEFAULT_SSHFORCE : False
 
 DATA:
   - host : "192.168.101.21"
     port : 3308
     user : "root"
     password : "123456"
+    sshport : 22
+    sshuser : 'root'
+    sshpassword : '123456'
   - host : "192.168.101.21"
     port : 3314
     user : "root"
     password : "123456"
-    ssh_password : "123456"
+    sshpassword : "123456"
   - host : "192.168.101.21"
     port : 3306
     user : "root"

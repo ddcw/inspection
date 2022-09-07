@@ -1,0 +1,49 @@
+WEB:
+  host : '0.0.0.0' #web端的监听地址
+  port : 80 #web端的监听端口
+  user : 'ddcw' #web控制台登录的用户. 后续再写@login (TODO)
+  password : '' #为空表示自动生成
+  logfile : 'logs/web.log' #web端的日志(TODO)
+
+MYSQL:
+  data_collection_time : 30 # 固定采集项-->持续采集项 收集时间
+  data_collection_interval : 1 #数据采集间隔, 单位秒 建议1, 这样模板里面就可以省去除以时间的操作
+  dict_passowrd : "conf/basic_passwords.txt" #密码字典的路径
+
+HOST:
+  enable : True #表示是否启用主机巡检
+  force : False #表示如果主机连接失败是否强制继续(不巡检主机信息) False 表示不强制  True表示主机连接失败就返回报错
+  mysql_error_log : False #是否采集mysql的错误日志 (仅<=5.7,  8.0采集系统表ps.error_log)
+  mysql_error_log_rows : 500 #采集mysql error日志多少行
+  mysql_slow_log : False #是否采集mysql的慢日志
+  mysql_slow_log_analyze_type : 'pt-query-digest' #如果不是pt-query-digest的话, 就python自己分析, 目前还不支持.
+  mysql_slow_log_analyze_host : 0 #0自动选择  1远程mysql实例  2本地(巡检脚本的主机) #都不行的话, 就不分析了
+
+#方便多个主机之间一起干活, 虽然没啥用...
+MANAGER:
+  host : '0.0.0.0' #manager监听的地址
+  port : 6121 #manager监听的端口
+  authkey : '1234567890abcdefghijklmn' #manager之间认证的密码
+
+OTHER:
+  inspection : 'conf/inspection.yaml' #具体的巡检项的配置文件路径
+  logfile : 'logs/inspection.log' #巡检日志  为空表示每个进程单独一个日志文件
+  default_score : [0, 0, 0.1, 0.4, 0.75, 1, ] #默认扣分策略
+  default_name : [['普通','general'], ['正常','normal'], ['提示','tips'], ['警告','Warning'], ['严重','serious'], ['致命','deadly']]
+  default_des : ['仅展示, 不做评分计算', '数据库此巡检项符合预期, 数据库正常运行', '影响微乎其微, 可以忽略. 对系统正常运行不影响', '对系统影响一般, 会导致数据库性能降低.', '对系统影响严重. 严重拖慢数据库运行,或者对数据库安全有影响', '对数据库影响特别严重. 可能导致数据库无法运行或者宕机'] #每个告警级别的描述
+  inspection_type : [['',''],['资源','内存和磁盘空间相关'], ['安全与稳定','系统账号的安全, 数据的安全(不丢数据)'], ['集群与高可用','主从,MGR,PXC等'], ['性能与规范','对MYSQL运行有影响的, 或者数据库设计规范'], ['参数','数据库参数'], ['其它','其它']]
+  health : [] #不做健康程度定义(巡检报告自己定义)
+  parallel : 4 #work的并发进程.  
+  raw_coll_data_save : False #是否保存原生的采集数据. 用于分析数据, 生成巡检报告 (不支持)
+  raw_ana_data_save : False #是否保存巡检后的原生数据(巡检报告的原始数据, 可用于生成巡检报告)
+  node_relation : True #是否构建节点关系 True:是  如果为True时, 会在生成完成之后再返回'成功'给客户端(不影响巡检报告的生成)
+  #node_relation_save : True #是否保存节点关系结果, 仅支持CSV  不保存的话, 就只有内存有, 重启就没了
+  node_relation_file : 'tmp' #节点关系保存路径
+  report_dir : 'tmp' #巡检报告存放目录
+  report_html : True #是否启用html巡检报告(jinja2-->html)
+  report_html_template : "templates/template.html" #HTML报告的模板
+  report_docx : True #是否启用docx巡检报告(python-docx)
+  report_docx_img_tmp : 'tmp' #临时存放图片的目录(docx要) (TODO)
+  report_docx_img_rm : True #是否删除临时图片 (TODO)
+  online : False #仅本脚本自带的生成html巡检报告才会用的变量.True表示巡检报告的样式由web服务器提供.False表示样式就放在巡检报告里面(已移除)
+  

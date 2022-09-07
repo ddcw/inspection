@@ -2,7 +2,7 @@
 <html>
 <head lang="zh">
 	<meta charset="UTF-8">
-	<title>MYSQL_{{data1['host']}}_{{data1['port']}}</title>
+	<title>MYSQL_{{baseinfo['host']}}_{{baseinfo['port']}}</title>
 <style type="text/css">
 a {text-decoration: none;}
 </style>
@@ -21,12 +21,12 @@ const colorlist = ["rgb(54, 162, 235)", "rgb(255, 99, 132)", "rgb(255, 205, 86)"
 
 </head>
 <body>
-<!-- 汇总信息  -->
+<!-- 汇总信息 -->
 <div >
 <table class="table">
 	<tr>
 		<td>MYSQL地址</td>
-		<td>{{data1['host']}}</td>
+		<td>{{baseinfo['host']}}</td>
 		<td rowspan='10'>
 			<div>
 			<canvas id="radar_rate" width="100" height="50"></canvas>
@@ -35,1537 +35,66 @@ const colorlist = ["rgb(54, 162, 235)", "rgb(255, 99, 132)", "rgb(255, 205, 86)"
 	</tr>
 	<tr>
 		<td>MYSQL端口</td>
-		<td>{{data1['port']}}</td>
+		<td>{{baseinfo['port']}}</td>
 	</tr>
 	<tr>
 		<td>MYSQL版本</td>
-		<td>{{data1['mysql_version']}}</td>
+		<td>{{baseinfo['version']}}</td>
 	</tr>
 	<tr>
 		<td>MYSQL使用内存</td>
-		<td>{{data['memory_global_total']['data'][0][0]}}</td>
+		<td>{{baseinfo['mem_total']}}</td>
 	</tr>
 	<tr>
 		<td>巡检时间</td>
-		<td>{{data1['inspection_time']}}</td>
+		<td>{{baseinfo['begin_time']}}</td>
 	</tr>
 	<tr>
-		<td>巡检项</td>
-		<td>{{data1['success_inspection_n']}}</td>
+		<td>巡检成功项</td>
+		<td>{{baseinfo['inspection_success']}}</td>
 	</tr>
 	<tr>
-		<td>Warning状态</td>
-		<td>{{data1['inspection_warning']}}</td>
-	</tr>
-	<tr>
-		<td>Error状态</td>
-		<td>{{data1['inspection_error']}}</td>
+		<td><span onclick="inspection_item_tool_tool('恢复')" >各阶段状态</span></td>
+		<td><span onclick="inspection_item_tool_tool('正常')">正常:{{baseinfo['inspection_level_1']}}</span> <span onclick="inspection_item_tool_tool('提示')">提示:{{baseinfo['inspection_level_2']}}</span> <span onclick="inspection_item_tool_tool('警告')">警告:{{baseinfo['inspection_level_3']}}</span> <span onclick="inspection_item_tool_tool('严重')">严重:{{baseinfo['inspection_level_4']}}</span> <span onclick="inspection_item_tool_tool('致命')">致命:{{baseinfo['inspection_level_5']}}</span></td>
 	</tr>
 	<tr>
 		<td>巡检得分(百分比)</td>
-		<td>{{data1['score_percent']}}</td>
+		<td>{{baseinfo['score']}}</td>
 	</tr>
 	<tr>
 		<td>当前角色</td>
-		<td>{{data1['role']}}</td>
+		<td>{{baseinfo['role']}}</td>
 	</tr>
 	<tr>
 		<td title='根据得分计算的(仅供参考,可自定义)'>健康状态</td>
-		{%if data1['score_percent']|int >= 85 %}
-			<td><p class="text-success">优</p></td>
-		{%elif data1['score_percent']|int >= 70%}
-			<td><p class="text-info">良</p></td>
-		{%elif data1['score_percent']|int >= 60%}
-			<td><p class="text-secondary">一般</p></td>
-		{%elif data1['score_percent']|int > 45%}
-			<td><p class="text-warning">差</p></td>
+		{%if baseinfo['score']|int >= 85 %}
+			<td title='棒棒哒'><p class="text-success">优</p></td>
+		{%elif baseinfo['score']|int >= 70%}
+			<td title='还不错'><p class="text-info">良</p></td>
+		{%elif baseinfo['score']|int >= 60%}
+			<td title='上升空间很大'><p class="text-secondary">一般</p></td>
+		{%elif baseinfo['score']|int > 45%}
+			<td title='???'><p class="text-warning">差</p></td>
 		{%else%}
-			<td><p class="text-danger">糟糕</p></td>
+			<td title='gg'><p class="text-danger">糟糕</p></td>
 		{%endif%}
 	</tr>
-</table>
-</div>
-
-
-<!-- 巡检项 -->
-<div>
-<table id='inspection_item'>
-	<thead>
-		<tr>
-			<th>巡检项</th>
-			<th>描述</th>
-			<th>是否巡检</th>
-			<th>分类</th>
-			<th>得分</th>
-			<th>总分</th>
-			<th>状态</th>
-		</tr>
-	</thead>
-	<tbody>
-		{%for x in data%}
-			<tr>
-				<td title='{{data[x]['des']}}'><a style='text-decoration:none;color:black;' href='#{{x}}'>{{x}}</a></td>
-				<td title='{{data[x]['des']}}'><a style='text-decoration:none;color:black;' href='#{{x}}'>{{data[x]['des']}}</a></td>
-				<td>{%if data[x]['status']%}巡检成功{%else%}未巡检/巡检失败{%endif%}</td>
-				<td>{%if data[x]['t1']==1%}安全与稳定{%elif data[x]['t1']==2%}性能与规范{%elif data[x]['t1']==3%}高可用(集群){%elif data[x]['t1']==4%}资源{%elif data[x]['t1']==5%}基础信息{%elif data[x]['t1']==6%}其它{%else%}其它{%endif%}</td>
-				<td>{{data[x]['score']}}</td>
-				<td>{{data[x]['old_score']}}</td>
-				{%if data[x]['type'] == 0%}
-					<td class="text-success">正常</td>
-				{%elif data[x]['type'] == 1%}
-					<td class="text-warning">Warning</td>
-				{%elif data[x]['type'] == 2%}
-					<td class="text-danger">Error</td>
-				{%else%}
-					<td class="text-secondary">其它</td>
-				{%endif%}
-			</tr>
-		{%endfor%}
-	</tbody>
-</table>
-</div>
-
-{% if data2['havedata'] %}
-<div>
-	<table class='table'>
-		<tr>
-			<td>主机名</td>
-			<td>{{data2['data']['data']['hostname']['stdout']}}</td>
-		</tr>
-		<tr>
-			<td>架构</td>
-			<td>{{data2['data']['data']['platform']['stdout']}}</td>
-		</tr>
-		<tr>
-			<td>内核</td>
-			<td>{{data2['data']['data']['kernel']['stdout']}}</td>
-		</tr>
-		<tr>
-			<td>CPU数量</td>
-			<td>{{data2['data']['data']['cpu_socket']['stdout']}} * {{data2['data']['data']['cpu_core']['stdout']}} * {{data2['data']['data']['cpu_thread']['stdout']}}</td>
-		</tr>
-		<tr>
-			<td>CPU型号</td>
-			<td>{{data2['data']['data']['cpu_name']['stdout']}}</td>
-		</tr>
-		<tr>
-			<td>总内存</td>
-			<td>{{data2['data']['data']['mem_total']['stdout']}} GB</td>
-		</tr>
-		<tr>
-			<td>可用内存</td>
-			<td>{{data2['data']['data']['mem_available']['stdout']}} GB</td>
-		</tr>
-		<tr>
-			<td>总SWAP</td>
-			<td>{{data2['data']['data']['swap_total']['stdout']}} GB (swappiness={{data2['data']['data']['swappiness']['stdout']}})</td>
-		</tr>
-		<tr>
-			<td>负载</td>
-			<td>{{data2['data']['data']['loadavg']['stdout']}}</td>
-		</tr>
-		<tr>
-			<td>时区</td>
-			<td>{{data2['data']['data']['timezone']['stdout']}}</td>
-		</tr>
-	</table>
-
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>对象</td>
-				<td>文件系统</td>
-				<td>类型</td>
-				<td>总大小</td>
-				<td>使用大小</td>
-				<td>可用大小</td>
-				<td>使用百分比</td>
-				<td>挂载点</td>
-			</tr>
-		</thead>
-		<tbody>
-			<tr>
-				<td>datadir</td>
-				<td>{{data2['data']['data']['datadir']['stdout'][0]}}</td>
-				<td>{{data2['data']['data']['datadir']['stdout'][1]}}</td>
-				<td>{{data2['data']['data']['datadir']['stdout'][2]}} GB</td>
-				<td>{{data2['data']['data']['datadir']['stdout'][3]}} GB</td>
-				<td>{{data2['data']['data']['datadir']['stdout'][4]}} GB</td>
-				<td>{{data2['data']['data']['datadir']['stdout'][5]}}</td>
-				<td>{{data2['data']['data']['datadir']['stdout'][6]}}</td>
-			</tr>
-			<tr>
-				<td>redodir</td>
-				<td>{{data2['data']['data']['redodir']['stdout'][0]}}</td>
-				<td>{{data2['data']['data']['redodir']['stdout'][1]}}</td>
-				<td>{{data2['data']['data']['redodir']['stdout'][2]}} GB</td>
-				<td>{{data2['data']['data']['redodir']['stdout'][3]}} GB</td>
-				<td>{{data2['data']['data']['redodir']['stdout'][4]}} GB</td>
-				<td>{{data2['data']['data']['redodir']['stdout'][5]}}</td>
-				<td>{{data2['data']['data']['redodir']['stdout'][6]}}</td>
-			</tr>
-			<tr>
-				<td>binlogdir</td>
-				<td>{{data2['data']['data']['binlogdir']['stdout'][0]}}</td>
-				<td>{{data2['data']['data']['binlogdir']['stdout'][1]}}</td>
-				<td>{{data2['data']['data']['binlogdir']['stdout'][2]}} GB</td>
-				<td>{{data2['data']['data']['binlogdir']['stdout'][3]}} GB</td>
-				<td>{{data2['data']['data']['binlogdir']['stdout'][4]}} GB</td>
-				<td>{{data2['data']['data']['binlogdir']['stdout'][5]}}</td>
-				<td>{{data2['data']['data']['binlogdir']['stdout'][6]}}</td>
-			</tr>
-			<tr>
-				<td>tmpdir</td>
-				<td>{{data2['data']['data']['tmpdir']['stdout'][0]}}</td>
-				<td>{{data2['data']['data']['tmpdir']['stdout'][1]}}</td>
-				<td>{{data2['data']['data']['tmpdir']['stdout'][2]}} GB</td>
-				<td>{{data2['data']['data']['tmpdir']['stdout'][3]}} GB</td>
-				<td>{{data2['data']['data']['tmpdir']['stdout'][4]}} GB</td>
-				<td>{{data2['data']['data']['tmpdir']['stdout'][5]}}</td>
-				<td>{{data2['data']['data']['tmpdir']['stdout'][6]}}</td>
-			</tr>
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-
-
-<!--命中率和innodb内存使用相关信息-->
-<!--  命中率为 -1 的话表示 未使用该选项 -->
-<h3>命中率和innodb使用情况</h3>
-<table class='table table-hover'>
-	{%if 'key_buffer_read_hits' in data%}
 	<tr>
-		<td>key_buffer_read_hits</td>
-		<td>{{data['key_buffer_read_hits']['data']}}%</td>
+		<td>运行时间</td>
+		<td>{{baseinfo['uptime']}} 天</td>
 	</tr>
-	{%endif%}
-	{%if 'key_buffer_write_hits' in  data%}
-	<tr>
-		<td>key_buffer_write_hits</td>
-		<td>{{data['key_buffer_write_hits']['data']}}%</td>
-	</tr>
-	{%endif%}
-	{%if 'query_cache_hits' in data%}
-	<tr>
-		<td>query_cache_hits</td>
-		<td>{{data['query_cache_hits']['data']}}%</td>
-	</tr>
-	{%endif%}
-	{%if 'innodb_buffer_read_hits' in data%}
-	<tr>
-		<td>innodb_buffer_read_hits</td>
-		<td>{{data['innodb_buffer_read_hits']['data']}}%</td>
-	</tr>
-	{%endif%}
-	{%if 'threads_hits' in  data %}
-	<tr>
-		<td>threads_hits</td>
-		<td>{{data['threads_hits']['data']}}%</td>
-	</tr>
-	{%endif%}
-	{%if 'table_open_cache_hits' in data%}
-	<tr>
-		<td>table_open_cache_hits</td>
-		<td>{{data['table_open_cache_hits']['data']}}%</td>
-	</tr>
-	{%endif%}
-
 </table>
 
-
-
-<!--参数相关信息-->
-<h3>参数相关信息</h3>
-<table class='table table-hover'>
-	<thead>
-		<tr>
-			<td>参数</td>
-			<td>值</td>
-			<td>描述/建议</td>
-		</tr>
-	</thead>
-	<tbody>
-		<tr>
-			<td>default_storage_engine</td>
-			<td>{{data['var_default_storage_engine']['data']}}</td>
-			<td>{{data['var_default_storage_engine']['des']}}</td>
-		</tr>
-		<tr>
-			<td>innodb_flush_log_at_trx_commit</td>
-			<td>{{data['var_innodb_flush_log_at_trx_commit']['data']}}</td>
-			<td>{{data['var_innodb_flush_log_at_trx_commit']['des']}}</td>
-		</tr>
-		<tr>
-			<td>sync_binlog</td>
-			<td>{{data['var_sync_binlog']['data']}}</td>
-			<td>{{data['var_innodb_flush_log_at_trx_commit']['des']}}</td>
-		</tr>
-		<tr>
-			<td>general_log</td>
-			<td>{{data['var_general_log']['data']}}</td>
-			<td>{{data['var_general_log']['des']}}</td>
-		</tr>
-		<tr>
-			<td>slow_query_log</td>
-			<td>{{data['var_slow_query_log']['data']}}</td>
-			<td>{{data['var_slow_query_log']['des']}}</td>
-		</tr>
-		<tr>
-			<td>log_bin</td>
-			<td>{{data['var_log_bin']['data']}}</td>
-			<td>{{data['var_log_bin']['des']}}</td>
-		</tr>
-		<tr>
-			<td>qcache</td>
-			<td>{{data['var_qcache']['data']}}</td>
-			<td>{{data['var_qcache']['des']}}</td>
-		<tr>
-		<tr>
-			<td>transaction_isolation</td>
-			<td>{{data['var_transaction_isolation']['data']}}</td>
-			<td>{{data['var_transaction_isolation']['des']}}</td>
-		<tr>
-		<tr>
-			<td>innodb_buffer_pool_size</td>
-			<td>{{data['var_innodb_buffer_pool_size']['data']}}</td>
-			<td>{{data['var_innodb_buffer_pool_size']['des']}}</td>
-		<tr>
-		<tr>
-			<td>innodb_lru_scan_depth</td>
-			<td>{{data['var_innodb_lru_scan_depth']['data']}}</td>
-			<td>{{data['var_innodb_lru_scan_depth']['des']}}</td>
-		<tr>
-		{%if var_max_allowed_packet in data%}
-		<tr>
-			<td>max_allowed_packet</td>
-			<td>{{data['var_max_allowed_packet']['data']}}</td>
-			<td>{{data['var_max_allowed_packet']['des']}}</td>
-		<tr>
-		{%endif%}
-		<tr>
-			<td>server_id</td>
-			<td>{{data['var_server_id']['data']}}</td>
-			<td>{{data['var_server_id']['des']}}</td>
-		<tr>
-		<tr>
-			<td>innodb_log_file_size</td>
-			<td>{{data['var_innodb_log_file_size']['data']}}</td>
-			<td>{{data['var_innodb_log_file_size']['des']}}</td>
-		<tr>
-		<tr>
-			<td>innodb_log_files_in_group</td>
-			<td>{{data['var_innodb_log_files_in_group']['data']}}</td>
-			<td>{{data['var_innodb_log_files_in_group']['des']}}</td>
-		<tr>
-		<tr>
-			<td>innodb_page_size</td>
-			<td>{{data['var_innodb_page_size']['data']}}</td>
-			<td>{{data['var_innodb_page_size']['des']}}</td>
-		<tr>
-		<tr>
-			<td>innodb_doublewrite</td>
-			<td>{{data['var_innodb_doublewrite']['data']}}</td>
-			<td>{{data['var_innodb_doublewrite']['des']}}</td>
-		<tr>
-		<tr>
-			<td>gtid_mode</td>
-			<td>{{data['var_gtid_mode']['data']}}</td>
-			<td>{{data['var_gtid_mode']['des']}}</td>
-		<tr>
-		<tr>
-			<td>performance_schema</td>
-			<td>{{data['var_performance_schema']['data']}}</td>
-			<td>{{data['var_performance_schema']['des']}}</td>
-		<tr>
-		<tr>
-			<td>character_set_database</td>
-			<td>{{data['var_character_set_database']['data']}}</td>
-			<td>{{data['var_character_set_database']['des']}}</td>
-		<tr>
-		<tr>
-			<td>binlog_format</td>
-			<td>{{data['var_binlog_format']['data']}}</td>
-			<td>{{data['var_binlog_format']['des']}}</td>
-		<tr>
-		<tr>
-			<td>binlog_row_image</td>
-			<td>{{data['var_binlog_row_image']['data']}}</td>
-			<td>{{data['var_binlog_row_image']['des']}}</td>
-		<tr>
-		<tr>
-			<td>max_connections</td>
-			<td>{{data['var_max_connections']['data']}}</td>
-			<td>{{data['var_max_connections']['des']}}</td>
-		<tr>
-		<tr>
-			<td>innodb_io_capacity</td>
-			<td>{{data['var_innodb_io_capacity']['data']}}</td>
-			<td>{{data['var_innodb_io_capacity']['des']}}</td>
-		<tr>
-		<tr>
-			<td>innodb_io_capacity_max</td>
-			<td>{{data['var_innodb_io_capacity_max']['data']}}</td>
-			<td>{{data['var_innodb_io_capacity_max']['des']}}</td>
-		<tr>
-		<tr>
-			<td>innodb_log_buffer_size</td>
-			<td>{{data['var_innodb_log_buffer_size']['data']}}</td>
-			<td>{{data['var_innodb_log_buffer_size']['des']}}</td>
-		<tr>
-
-	</tbody>
-</table>
-
-{%if data['schema_object_overview']['status']%}
-<div>
-	<h3 id='schema_object_overview'>{{data['schema_object_overview']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>对象类型</td>
-				<td>对象数量</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['schema_object_overview']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-
-{%if data['no_primary_key']['status']%}
-<div>
-	<h3 id='no_primary_key'>{{data['no_primary_key']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>表名</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['no_primary_key']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['redundant_indexes']['status']%}
-<div>
-	<h3 id='redundant_indexes'>{{data['redundant_indexes']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>表名</td>
-				<td>冗余索引名</td>
-				<td>冗余字段名</td>
-				<td>主索引名</td>
-				<td>主索引字段</td>
-				<td>建议SQL(删除冗余索引)</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['redundant_indexes']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-				<td>{{row[5]}}</td>
-				<td>{{row[6]}}</td>
-				<td>{{row[9]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['unused_indexes']['status']%}
-<div>
-	<h3 id='unused_indexes'>{{data['unused_indexes']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>表名</td>
-				<td>未使用的索引</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['unused_indexes']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['full_table_scans']['status']%}
-<div>
-	<h3 id='full_table_scans'>{{data['full_table_scans']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>表名</td>
-				<td>全表扫描的总行数</td>
-				<td>全表扫描的总等待时间</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['full_table_scans']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['partitions']['status']%}
-<div>
-	<h3 id='partitions'>{{data['partitions']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>表名</td>
-				<td>分区数量</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['partitions']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['auto_increment_columns']['status']%}
-<div>
-	<h3 id='auto_increment_columns'>{{data['auto_increment_columns']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>表名</td>
-				<td>字段</td>
-				<td>使用率</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['auto_increment_columns']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[9]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['cold_table']['status']%}
-<div>
-	<h3 id='cold_table'>{{data['cold_table']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>表名</td>
-				<td>更新时间</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['cold_table']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['no_innodb']['status']%}
-<div>
-	<h3 id='no_innodb'>{{data['no_innodb']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>表名</td>
-				<td>引擎名</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['no_innodb']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['big_table']['status']%}
-<div>
-	<h3 id='big_table'>{{data['big_table']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>表名</td>
-				<td>表行数</td>
-				<td>表数据量</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['big_table']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-
-{%if data['table_static_expired']['status']%}
-<div>
-	<h3 id='table_static_expired'>{{data['table_static_expired']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>表名</td>
-				<td>最后一次更新时间</td>
-				<td>行数</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['table_static_expired']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['table_fragment']['status']%}
-<div>
-	<h3 id='table_fragment'>{{data['table_fragment']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>表名</td>
-				<td>数据大小</td>
-				<td>碎片大小</td>
-				<td>碎片率</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['table_fragment']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-				<td>{{row[4]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['is_nullable']['status']%}
-<div>
-	<h3 id='is_nullable'>{{data['is_nullable']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库名</td>
-				<td>表名</td>
-				<td>字段名</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['is_nullable']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['same_user_password']['status']%}
-<div>
-	<h3 id='same_user_password'>{{data['same_user_password']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>用户</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['same_user_password']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['expired_password']['status']%}
-<div>
-	<h3 id='expired_password'>{{data['expired_password']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>用户</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['expired_password']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-
-{%if data['anonymous_user']['status']%}
-<div>
-	<h3 id='anonymous_user'>{{data['anonymous_user']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>用户</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['anonymous_user']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-
-{%if data['any_host']['status']%}
-<div>
-	<h3 id='any_host'>{{data['any_host']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>用户</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['any_host']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['simple_password']['status']%}
-<div>
-	<h3 id='simple_password'>{{data['simple_password']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>用户</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['simple_password']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['account_user']['status']%}
-<div>
-	<h3 id='account_user'>{{data['account_user']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>用户</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['account_user']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['innodb_buffer_stats_by_schema']['status']%}
-<div>
-	<h3 id='innodb_buffer_stats_by_schema'>{{data['innodb_buffer_stats_by_schema']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>库(对象)</td>
-				<td>分配的总内存</td>
-				<td>数据总内存</td>
-				<td>分配的总页数</td>
-				<td>缓存的总行数</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['innodb_buffer_stats_by_schema']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-				<td>{{row[6]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['innodb_buffer_stats_by_table']['status']%}
-<div>
-	<h3 id='innodb_buffer_stats_by_table'>{{data['innodb_buffer_stats_by_table']['des']}}</h3>
-	<table id='innodb_buffer_stats_by_table_table' class='table table-hover'>
-	<!--	<thead>
-			<tr>
-				<td>库(对象)</td>
-				<td>表(对象)</td>
-				<td>分配的总内存</td>
-				<td>数据总内存</td>
-				<td>分配的总页数</td>
-				<td>缓存的总行数</td>
-			</tr>
-		<thead>
-	-->
-		<tbody>
-			{%for row in data['innodb_buffer_stats_by_table']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-				<td>{{row[4]}}</td>
-				<td>{{row[7]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-	<script>
-		var $innodb_buffer_stats_by_table_table= $('#innodb_buffer_stats_by_table_table')
-		$(function (){
-			$innodb_buffer_stats_by_table_table.bootstrapTable({
-				sortable: true,
-				pagination: true,
-				pageList: [10, 20, 30, 100],
-				search: true,
-				//showColumns: true,
-				//showToggle: true,
-				//clickToSelect: true,
-				//showRefresh: true,
-				columns : [
-					{
-					field: 'Object_name',
-					title:'库(对象)',
-					sortable: true,
-					},
-					{
-					field: 'table',
-					title:'表(对象)',
-					sortable: true,
-					},
-					{
-					field: 'total_mem',
-					title:'分配的总内存',
-					sortable: true,
-					},
-					{
-					field: 'data_mem',
-					title:'数据总内存',
-					sortable: true,
-					},
-					{
-					field: 'total_page',
-					title:'分配的总页数',
-					sortable: true,
-					},
-					{
-					field: 'rows',
-					title:'缓存的总行数',
-					sortable: true,
-					},
-				],
-
-			})
-		})
-	</script>
-
-{%endif%}
-
-{%if data['memory_global_by_current_bytes']['status']%}
-<div>
-	<h3 id='memory_global_by_current_bytes'>{{data['memory_global_by_current_bytes']['des']}}</h3>
-	<table id='memory_global_by_current_bytes_table' class='table table-hover'>
-	<!--	<thead>
-			<tr>
-				<th>事件名</th>
-				<th>事件发生次数</th>
-				<th>当前占用的内存</th>
-				<th>平均每个事件当前占用的内存</th>
-				<th>最多分配的块数(high_count)</th>
-				<th>最多分配的大小(字节)(high_alloc)</th>
-				<th>为事件分配的每个内存块的平均字节数的高水位线</th>
-			</tr>
-		<thead>
-	-->
-		<tbody>
-			{%for row in data['memory_global_by_current_bytes']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-				<td>{{row[4]}}</td>
-				<td>{{row[5]}}</td>
-				<td>{{row[6]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-<!--排个序-->
-	<script>
-		var $table_memory_global_by_current_bytes= $('#memory_global_by_current_bytes_table')
-		$(function (){
-			$table_memory_global_by_current_bytes.bootstrapTable({
-				sortable: true,
-				pagination: true,
-				pageList: [10, 20, 30, 1000],
-				search: true,
-				//showColumns: true,
-				//showToggle: true,
-				//clickToSelect: true,
-				//showRefresh: true,
-				columns : [
-					{
-					field: 'Event_name',
-					title:'事件名',
-					sortable: true,
-					},
-					{
-					field: 'event_count',
-					title:'事件发生次数',
-					sortable: true,
-					},
-					{
-					field: 'mem',
-					title:'当前占用的内存',
-					sortable: true,
-					},
-					{
-					field: 'avg_mem',
-					title:'平均每个事件当前占用的内存',
-					sortable: true,
-					},
-					{
-					field: 'high_count',
-					title:'最多分配的块数(high_count)',
-					sortable: true,
-					},
-					{
-					field: 'high_alloc',
-					title:'最多分配的大小(字节)(high_alloc)',
-					sortable: true,
-					},
-					{
-					field: 'aa',
-					title:'为事件分配的每个内存块的平均字节数的高水位线',
-					sortable: true,
-					},
-				],
-
-			})
-		})
-	</script>
-
-
-{%endif%}
-
-{%if data['io_by_thread_by_latency']['status']%}
-<div>
-	<h3 id='io_by_thread_by_latency'>{{data['io_by_thread_by_latency']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>用户/线程</td>
-				<td>总IO次数</td>
-				<td>总IO延迟</td>
-				<td>最小延迟</td>
-				<td>平均延迟</td>
-				<td>最大延迟</td>
-				<td>线程ID</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['io_by_thread_by_latency']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-				<td>{{row[4]}}</td>
-				<td>{{row[5]}}</td>
-				<td>{{row[6]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['io_global_by_wait_by_latency']['status']%}
-<div>
-	<h3 id='io_global_by_wait_by_latency'>{{data['io_global_by_wait_by_latency']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>事件</td>
-				<td>总IO次数</td>
-				<td>总IO延迟</td>
-				<td>读IO总延迟</td>
-				<td>写IO总延迟</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['io_global_by_wait_by_latency']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[5]}}</td>
-				<td>{{row[6]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['user_summary_by_file_io']['status']%}
-<div>
-	<h3 id='user_summary_by_file_io'>{{data['user_summary_by_file_io']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>用户</td>
-				<td>总IO次数</td>
-				<td>总IO延迟</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['user_summary_by_file_io']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['wait_classes_global_by_latency']['status']%}
-<div>
-	<h3 id='wait_classes_global_by_latency'>{{data['wait_classes_global_by_latency']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>事件类</td>
-				<td>总次数</td>
-				<td>总延迟</td>
-				<td>最小延迟</td>
-				<td>平均延迟</td>
-				<td>最大延迟</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['wait_classes_global_by_latency']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-				<td>{{row[4]}}</td>
-				<td>{{row[5]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['waits_global_by_latency']['status']%}
-<div>
-	<h3 id='waits_global_by_latency'>{{data['waits_global_by_latency']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>事件类</td>
-				<td>总次数</td>
-				<td>总延迟</td>
-				<td>平均延迟</td>
-				<td>最大延迟</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['waits_global_by_latency']['data']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-				<td>{{row[4]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['innodb_lock_waits']['status']%}
-<div>
-	<h3 id='innodb_lock_waits'>{{data['innodb_lock_waits']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>表</td>
-				<td>waiting_pid</td>
-				<td>waiting_query</td>
-				<td>blocking_pid</td>
-				<td>blocking_query</td>
-				<td>sql_kill_blocking_query</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['innodb_lock_waits']['data']%}
-			<tr>
-				<td>{{row[3]}}</td>
-				<td>{{row[11]}}</td>
-				<td>{{row[12]}}</td>
-				<td>{{row[16]}}</td>
-				<td>{{row[17]}}</td>
-				<td>{{row[24]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['slave_info']['status']%}
-<div>
-	<h3 id='slave_info'>{{data['slave_info']['des']}}</h3>
-	<table class='table table-hover'>
-		<tbody>
-			<tr>
-				<td>Slave_IO_State</td>
-				{%for i in data['slave_info']['data']['Slave_IO_State']%}
-				<td>{{data['slave_info']['data']['Slave_IO_State'][i]}}</td>
-				{%endfor%}
-			</tr>
-			<tr>
-				<td>Master_Host</td>
-				{%for i in data['slave_info']['data']['Master_Host']%}
-				<td>{{data['slave_info']['data']['Master_Host'][i]}}</td>
-				{%endfor%}
-			</tr>
-			<tr>
-				<td>Master_Port</td>
-				{%for i in data['slave_info']['data']['Master_Port']%}
-				<td>{{data['slave_info']['data']['Master_Port'][i]}}</td>
-				{%endfor%}
-			</tr>
-			<tr>
-				<td>Slave_IO_Running</td>
-				{%for i in data['slave_info']['data']['Slave_IO_Running']%}
-				<td>{{data['slave_info']['data']['Slave_IO_Running'][i]}}</td>
-				{%endfor%}
-			</tr>
-			<tr>
-				<td>Slave_SQL_Running</td>
-				{%for i in data['slave_info']['data']['Slave_SQL_Running']%}
-				<td>{{data['slave_info']['data']['Slave_SQL_Running'][i]}}</td>
-				{%endfor%}
-			</tr>
-			<tr>
-				<td>SQL_Delay</td>
-				{%for i in data['slave_info']['data']['SQL_Delay']%}
-				<td>{{data['slave_info']['data']['SQL_Delay'][i]}}</td>
-				{%endfor%}
-			</tr>
-			<tr>
-				<td>Last_IO_Error</td>
-				{%for i in data['slave_info']['data']['Last_IO_Error']%}
-				<td>{{data['slave_info']['data']['Last_IO_Error'][i]}}</td>
-				{%endfor%}
-			</tr>
-			<tr>
-				<td>Slave_SQL_Running_State</td>
-				{%for i in data['slave_info']['data']['Slave_SQL_Running_State']%}
-				<td>{{data['slave_info']['data']['Slave_SQL_Running_State'][i]}}</td>
-				{%endfor%}
-			</tr>
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['pxc_info']['status']%}
-<div>
-	<h3 id='pxc_info'>{{data['pxc_info']['des']}}</h3>
-	<table class='table table-hover'>
-		<tbody>
-			<tr>
-				<td>wsrep_cluster_status</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_cluster_status']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_cluster_size</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_cluster_size']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_cluster_state_uuid</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_cluster_state_uuid']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_connected</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_connected']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_ready</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_ready']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_local_state_comment</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_local_state_comment']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_local_state_comment</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_local_state_comment']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_local_state_uuid</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_local_state_uuid']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_provider_vendor</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_provider_vendor']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_provider_name</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_provider_name']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_protocol_version</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_protocol_version']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_replicated_bytes</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_replicated_bytes']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_received_bytes</td>
-				<td>{{data['pxc_info']['data']['status']['wsrep_received_bytes']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_sst_method</td>
-				<td>{{data['pxc_info']['data']['variables']['wsrep_sst_method']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_sst_allowed_methods</td>
-				<td>{{data['pxc_info']['data']['variables']['wsrep_sst_allowed_methods']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_sync_wait</td>
-				<td>{{data['pxc_info']['data']['variables']['wsrep_sync_wait']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_provider</td>
-				<td>{{data['pxc_info']['data']['variables']['wsrep_provider']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_on</td>
-				<td>{{data['pxc_info']['data']['variables']['wsrep_on']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_node_name</td>
-				<td>{{data['pxc_info']['data']['variables']['wsrep_node_name']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_node_address</td>
-				<td>{{data['pxc_info']['data']['variables']['wsrep_node_address']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_max_ws_size</td>
-				<td>{{data['pxc_info']['data']['variables']['wsrep_max_ws_size']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_cluster_address</td>
-				<td>{{data['pxc_info']['data']['variables']['wsrep_cluster_address']}}</td>
-			</tr>
-			<tr>
-				<td>wsrep_cluster_name</td>
-				<td>{{data['pxc_info']['data']['variables']['wsrep_cluster_name']}}</td>
-			</tr>
-		</tbody>
-	</table>
-</div>
-{%endif%}
-
-{%if data['mgr_info']['status']%}
-<div>
-	<h3 id='mgr_info'>{{data['mgr_info']['des']}}</h3>
-	<table class='table table-hover'>
-		<thead>
-			<tr>
-				<td>CHANNEL_NAME</td>
-				<td>MEMBER_ID</td>
-				<td>MEMBER_HOST</td>
-				<td>MEMBER_PORT</td>
-				<td>MEMBER_STATE</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['mgr_info']['data']['data1']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-				<td>{{row[4]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	</table>
-	<table class='table table-hover'>
-		<tr>
-			<td>CHANNEL_NAME</td>
-			{%for row in data['mgr_info']['data']['data2']%}
-			<td>{{row[0]}}</td>
-			{%endfor%}
-		</tr>
-		<tr>
-			<td>VIEW_ID</td>
-			{%for row in data['mgr_info']['data']['data2']%}
-			<td>{{row[1]}}</td>
-			{%endfor%}
-		</tr>
-		<tr>
-			<td>MEMBER_ID</td>
-			{%for row in data['mgr_info']['data']['data2']%}
-			<td>{{row[2]}}</td>
-			{%endfor%}
-		</tr>
-		<tr>
-			<td>COUNT_TRANSACTIONS_IN_QUEUE</td>
-			{%for row in data['mgr_info']['data']['data2']%}
-			<td>{{row[3]}}</td>
-			{%endfor%}
-		</tr>
-		<tr>
-			<td>COUNT_TRANSACTIONS_CHECKED</td>
-			{%for row in data['mgr_info']['data']['data2']%}
-			<td>{{row[4]}}</td>
-			{%endfor%}
-		</tr>
-		<tr>
-			<td>COUNT_CONFLICTS_DETECTED</td>
-			{%for row in data['mgr_info']['data']['data2']%}
-			<td>{{row[5]}}</td>
-			{%endfor%}
-		</tr>
-		<tr>
-			<td>COUNT_TRANSACTIONS_ROWS_VALIDATING</td>
-			{%for row in data['mgr_info']['data']['data2']%}
-			<td>{{row[6]}}</td>
-			{%endfor%}
-		</tr>
-		<tr>
-			<td>TRANSACTIONS_COMMITTED_ALL_MEMBERS</td>
-			{%for row in data['mgr_info']['data']['data2']%}
-			<td>{{row[7]}}</td>
-			{%endfor%}
-		</tr>
-		<tr>
-			<td>LAST_CONFLICT_FREE_TRANSACTION</td>
-			{%for row in data['mgr_info']['data']['data2']%}
-			<td>{{row[8]}}</td>
-			{%endfor%}
-		</tr>
-	<!--	<thead>
-			<tr>
-				<td>CHANNEL_NAME</td>
-				<td>VIEW_ID</td>
-				<td>MEMBER_ID</td>
-				<td>COUNT_TRANSACTIONS_IN_QUEUE</td>
-				<td>COUNT_TRANSACTIONS_CHECKED</td>
-				<td>COUNT_CONFLICTS_DETECTED</td>
-				<td>COUNT_TRANSACTIONS_ROWS_VALIDATING</td>
-				<td>TRANSACTIONS_COMMITTED_ALL_MEMBERS</td>
-				<td>LAST_CONFLICT_FREE_TRANSACTION</td>
-			</tr>
-		<thead>
-		<tbody>
-			{%for row in data['mgr_info']['data']['data2']%}
-			<tr>
-				<td>{{row[0]}}</td>
-				<td>{{row[1]}}</td>
-				<td>{{row[2]}}</td>
-				<td>{{row[3]}}</td>
-				<td>{{row[4]}}</td>
-				<td>{{row[5]}}</td>
-				<td>{{row[6]}}</td>
-				<td>{{row[7]}}</td>
-				<td>{{row[8]}}</td>
-			</tr>
-			{%endfor%}
-		</tbody>
-	-->
-	</table>
-</div>
-{%endif%}
-
-
-<h3>MYSQL网络情况</h3>
-<div>
-<canvas id="net_rate_in" width="100" height="50"></canvas>
-</div>
-<script>
-const ctx_net_rate_in = document.getElementById('net_rate_in');
-const myChart_net_rate_in = new Chart(ctx_net_rate_in, {
-	type: 'line',
-	data: {
-		labels: ['{{data['bytes_received_list']['data']['time']| join("','")}}'] ,
-			datasets: [
-				{label: '接收数据(字节)',
-				data:[{{data['bytes_received_list']['data']['data']|join(",")}}],
-				backgroundColor:"rgb(54, 162, 235)",
-				//yAxisID:'A',
-				fill: true,
-				},
-				{label: '发送数据(字节)',
-				data:[{{data['bytes_sent_list']['data']['data']|join(",")}}],
-				backgroundColor:"rgb(255, 99, 132)",
-				//yAxisID:'A',
-				fill: true,
-				},
-				]
-		
-	},
- options: {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: true,
-      }
-    }
-  },
-});
-myChart_net_rate_in.canvas.parentNode.style.height = '50vh';
-myChart_net_rate_in.canvas.parentNode.style.width = '100vh';
-</script>
-
+<!-- 雷达图js -->
 <script>
 const ctx_radar_rate= document.getElementById('radar_rate');
 const myChart_radar_rate= new Chart(ctx_radar_rate, {
 	type: 'radar',
 	data: {
-		labels: ['{{data1['radar_list1']| join("','")}}'] ,
+		labels: ['{{baseinfo["radar_name"]| join("','")}}'] ,
 		datasets: [
 			{label: '得分雷达图',
-			data:[{{data1['radar_list2']|join(",")}}],
+			data:[{{baseinfo["radar1"]|join(",")}}],
 			//backgroundColor:colorlist,
 			fill: true,
 			"backgroundColor": "rgb(54, 162, 235, 0.25)",
@@ -1591,8 +120,335 @@ const myChart_radar_rate= new Chart(ctx_radar_rate, {
 myChart_radar_rate.canvas.parentNode.style.height = '50vh';
 myChart_radar_rate.canvas.parentNode.style.width = '50vh';
 </script>
+</div>
+
+<!-- 巡检项汇总 -->
+<div>
+<table id='inspection_item' data-filter-control="true">
+	<!-- 筛选工具 -->
+	<div id='inspection_item_tool' style='display:none'>
+	<button onclick="inspection_item_tool_tool('正常')">仅查看告警为<正常>({{baseinfo['inspection_level_1']}})的巡检项</button>
+	<button onclick="inspection_item_tool_tool('提示')">仅查看告警为<提示>({{baseinfo['inspection_level_2']}})的巡检项</button>
+	<button onclick="inspection_item_tool_tool('警告')">仅查看告警为<警告>({{baseinfo['inspection_level_3']}})的巡检项</button>
+	<button onclick="inspection_item_tool_tool('严重')">仅查看告警为<严重>({{baseinfo['inspection_level_4']}})的巡检项</button>
+	<button onclick="inspection_item_tool_tool('致命')">仅查看告警为<致命>({{baseinfo['inspection_level_5']}})的巡检项</button>
+	<button onclick="inspection_item_tool_tool('恢复')">仅查看告警为<恢复>的巡检项</button>
+	</div>
+	<thead>
+		<tr>
+			<th>巡检项</th>
+			<th>描述</th>
+			<th data-sortable="true">是否巡检成功</th>
+			<th data-field="type1" data-sortable="true" data-filter-control="true">分类</th>
+			<th data-sortable="true">得分</th>
+			<th data-field='t1a' data-sortable="true">总分</th>
+			<th data-field='t1' data-sortable="true">状态</th>
+		</tr>
+	</thead>
+	<tbody>
+		{%for x in data%}
+			<tr>
+				<td title='{{data[x]['des']}}'><a style='text-decoration:none;color:black;' href='#{{x}}'>{{x}}</a></td>
+				<td title='{{data[x]['des']}}'><a style='text-decoration:none;color:black;' href='#{{x}}'>{{data[x]['des'
+]}}</a></td>
+				<td>{%if data[x]['status']%}巡检成功{%else%}未巡检/巡检失败{%endif%}</td>
+				<td>{%if data[x]['type']==1%}资源{%elif data[x]['type']==2%}安全与稳定{%elif data[x]['type']==3%}集群与高可用{%elif data[x]['type']==4%}性能与规范{%elif data[x]['type']==5%}参数{%elif data[x]['type']==6%}其它{%else%}其它{%endif%}</td>
+				<td>{{data[x]['score']}}</td>
+				<td>{{data[x]['old_score']}}</td>
+			
+				{%if data[x]['level'] == 0%}
+					<td class="">普通</td>
+				{%elif data[x]['level'] == 1%}
+					<td class="text-success">正常</td>
+				{%elif data[x]['level'] == 2%}
+					<td class="text-info" title='影响微乎其微, 可以忽略. 对系统正常运行不影响'>提示</td>
+				{%elif data[x]['level'] == 3%}
+					<td class="text-warning" title='对系统影响一般, 会导致数据库性能降低'>警告</td>
+				{%elif data[x]['level'] == 4%}
+					<td class="text-danger" title='对系统影响严重. 严重拖慢数据库运行'>严重</td>
+				{%elif data[x]['level'] == 5%}
+					<td class="text-danger spinner-grow" title='对数据库影响特别严重'>致命</td>
+				{%else%}
+					<td class="text-secondary" title='不知道, 理论上你不会看到'>其它</td>
+				{%endif%}
+			</tr>
+		{%endfor%}
+	</tbody>
+</table>
+	<script>
+		function inspection_item_tool_tool(aa){
+			var $table_inspection_item1 = $('#inspection_item')
+			if (aa=='恢复'){
+				$table_inspection_item1.bootstrapTable('filterBy', {t1: ['正常','提示','警告','严重','致命']});
+			}
+			else{
+				$table_inspection_item1.bootstrapTable('filterBy', {t1: [aa]});
+			}
+		}
+	</script>
+	<script>
+		var $table_inspection_item = $('#inspection_item')
+		$(function (){
+			$table_inspection_item.bootstrapTable({
+				sortable: true,
+				pagination: true,
+				pageList: [10, 20, 30, 100],
+				search: true,
+				showColumns: true,
+				showToggle: true,
+				clickToSelect: true,
+				//showRefresh: true,
+
+			})
+		})
+	</script>
+</div>
 
 
+<!-- 主机相关信息  -->
+{% if hostdata['status'] %}
+</br><h3>主机相关信息</h3>
+<div>
+	<table class='table'>
+		<tr>
+			<td>主机名</td>
+			<td>{{hostdata['data']['hostname']['stdout']}}</td>
+		</tr>
+		<tr>
+			<td>架构</td>
+			<td>{{hostdata['data']['platform']['stdout']}}</td>
+		</tr>
+		<tr>
+			<td>内核</td>
+			<td>{{hostdata['data']['kernel']['stdout']}}</td>
+		</tr>
+		<tr>
+			<td>CPU数量</td>
+			<td>{{hostdata['data']['cpu_socket']['stdout']}} * {{hostdata['data']['cpu_core']['stdout']}} * {{hostdata['data']['cpu_thread']['stdout']}}</td>
+		</tr>
+		<tr>
+			<td>CPU型号</td>
+			<td>{{hostdata['data']['cpu_name']['stdout']}}</td>
+		</tr>
+		<tr>
+			<td>总内存</td>
+			<td>{{hostdata['data']['mem_total']['stdout']}} GB</td>
+		</tr>
+		<tr>
+			<td>可用内存</td>
+			<td>{{hostdata['data']['mem_available']['stdout']}} GB</td>
+		</tr>
+		<tr>
+			<td>总SWAP</td>
+			<td>{{hostdata['data']['swap_total']['stdout']}} GB (swappiness={{hostdata['data']['swappiness']['stdout']}})</td>
+		</tr>
+		<tr>
+			<td>负载</td>
+			<td>{{hostdata['data']['loadavg']['stdout']}}</td>
+		</tr>
+		<tr>
+			<td>时区</td>
+			<td>{{hostdata['data']['timezone']['stdout']}}</td>
+		</tr>
+	</table>
+
+	<!-- 目录相关信息 -->
+	</br><h3>数据库目录相关信息</h3>
+	{%if hostdata['data']['dirstatus']%}
+	<table class='table table-hover'>
+		<thead>
+			<tr>
+				<td>对象</td>
+				<td>文件系统</td>
+				<td>类型</td>
+				<td>总大小</td>
+				<td>使用大小</td>
+				<td>可用大小</td>
+				<td>使用百分比</td>
+				<td>挂载点</td>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td title="本目录占用空间{{hostdata['data']['datadir']['other']['stdout']}}">datadir</td>
+				<td>{{hostdata['data']['datadir']['stdout'][0]}}</td>
+				<td>{{hostdata['data']['datadir']['stdout'][1]}}</td>
+				<td>{{hostdata['data']['datadir']['stdout'][2]}} GB</td>
+				<td>{{hostdata['data']['datadir']['stdout'][3]}} GB</td>
+				<td>{{hostdata['data']['datadir']['stdout'][4]}} GB</td>
+				<td>{{hostdata['data']['datadir']['stdout'][5]}}</td>
+				<td>{{hostdata['data']['datadir']['stdout'][6]}}</td>
+			</tr>
+			<tr>
+				<td title="本目录占用空间{{hostdata['data']['redodir']['other']['stdout']}}">redodir</td>
+				<td>{{hostdata['data']['redodir']['stdout'][0]}}</td>
+				<td>{{hostdata['data']['redodir']['stdout'][1]}}</td>
+				<td>{{hostdata['data']['redodir']['stdout'][2]}} GB</td>
+				<td>{{hostdata['data']['redodir']['stdout'][3]}} GB</td>
+				<td>{{hostdata['data']['redodir']['stdout'][4]}} GB</td>
+				<td>{{hostdata['data']['redodir']['stdout'][5]}}</td>
+				<td>{{hostdata['data']['redodir']['stdout'][6]}}</td>
+			</tr>
+			<tr>
+				<td title="本目录占用空间{{hostdata['data']['binlogdir']['other']['stdout']}}">binlogdir</td>
+				<td>{{hostdata['data']['binlogdir']['stdout'][0]}}</td>
+				<td>{{hostdata['data']['binlogdir']['stdout'][1]}}</td>
+				<td>{{hostdata['data']['binlogdir']['stdout'][2]}} GB</td>
+				<td>{{hostdata['data']['binlogdir']['stdout'][3]}} GB</td>
+				<td>{{hostdata['data']['binlogdir']['stdout'][4]}} GB</td>
+				<td>{{hostdata['data']['binlogdir']['stdout'][5]}}</td>
+				<td>{{hostdata['data']['binlogdir']['stdout'][6]}}</td>
+			</tr>
+			<tr>
+				<td title="本目录占用空间{{hostdata['data']['tmpdir']['other']['stdout']}}">tmpdir</td>
+				<td>{{hostdata['data']['tmpdir']['stdout'][0]}}</td>
+				<td>{{hostdata['data']['tmpdir']['stdout'][1]}}</td>
+				<td>{{hostdata['data']['tmpdir']['stdout'][2]}} GB</td>
+				<td>{{hostdata['data']['tmpdir']['stdout'][3]}} GB</td>
+				<td>{{hostdata['data']['tmpdir']['stdout'][4]}} GB</td>
+				<td>{{hostdata['data']['tmpdir']['stdout'][5]}}</td>
+				<td>{{hostdata['data']['tmpdir']['stdout'][6]}}</td>
+			</tr>
+		</tbody>
+	</table>
+	{%endif%}
+</div>
+{%endif%}
+
+<!-- 数据库引擎相关 (各种使用率, 比如key buffer命中率) -->
+</br>
+<div>
+	<h3 title='缓存相关,使用率之类的'>数据库引擎相关</h3>
+	<table class='table table-hover'>
+		<thead>
+			<th>对象</th>
+			<th>值</th>
+		</thead>
+		<tbody>
+			<tr {%if baseinfo['key_buffer_read_hits'] == -1 %}title='未使用key_buffer'{%endif%}>
+				<td>key_buffer_read_hits</td>
+				<td>{{baseinfo['key_buffer_read_hits']}}%</td>
+			</tr>
+			<tr>
+				<td>key_buffer_write_hits</td>
+				<td>{{baseinfo['key_buffer_write_hits']}}%</td>
+			</tr>
+			<tr {%if baseinfo['query_cache_hits'] == -1 %}title='未使用查询缓存'{%endif%}>
+				<td>query_cache_hits</td>
+				<td>{{baseinfo['query_cache_hits']}}%</td>
+			</tr>
+			<tr>
+				<td>innodb_buffer_read_hits</td>
+				<td>{{baseinfo['innodb_buffer_read_hits']}}%</td>
+			</tr>
+			<tr>
+				<td>table_open_cache_hits</td>
+				<td>{{baseinfo['table_open_cache_hits']}}%</td>
+			</tr>
+			<tr>
+				<td title='总内存:{{baseinfo["innodb_mem_total"]}}MB'>innodb内存使用率</td>
+				<td>{{baseinfo['innodb_mem_used_p']}}%</td>
+			</tr>
+		</tbody>
+	</table>
+<div>
+
+<!--数据库表信息-->
+</br>
+<div>
+<h3>数据库基础信息</h3>
+<table class='table table-hover'>
+	<thead>
+		<th>数据库名</th>
+		<th>数据大小</th>
+		<th>索引大小</th>
+		<th>默认字符集</th>
+	</thead>
+	<tbody>
+{%for db in baseinfo['db_table']['data'].values%}
+	<tr>
+		<td>{{db[0]}}</td>
+		<td>{{(db[1]|int/1024/1024/1024)|round(2)}} GB</td>
+		<td>{{(db[2]|int/1024/1024/1024)|round(2)}} GB</td>
+		<td>{{db[3]}}</td>
+	</tr>
+{%endfor%}
+	</tbody>
+</table>
+</div>
+
+<!-- 数据库参数 -->
+</br>
+<div>
+<h3>数据库参数</h3>
+<table class='table table-hover'>
+	<thead>
+		<th>参数</th>
+		<th>值</th>
+		<th>描述</th>
+		<th>建议</th>
+	</thead>
+	<tbody>
+{%for inspection_item in data%}
+	{%if data[inspection_item]['type'] == 5 and data[inspection_item]['status']%}
+	<tr id={{inspection_item}}>
+		<td>{{inspection_item}}</td>
+		<td>{{data[inspection_item]['data'].values[0][0]}}</td>
+		<td>{{data[inspection_item]['des']}}</td>
+		{%if data[inspection_item]['score'] < data[inspection_item]['old_score']%}
+		<td>{{data[inspection_item]['suggestion']}}</td>
+		{%endif%}
+	</tr>
+	{%endif%}
+{%endfor%}
+	<tbody>
+</table>
+</div>
+
+<!-- 数据库状态(就是画那几张图)  -->
+{%if data1_result['status']%}
+</br>
+<h3>MYSQL网络情况</h3>
+<div>
+<canvas id="net_rate_in" width="100" height="50"></canvas>
+</div>
+<script>
+const ctx_net_rate_in = document.getElementById('net_rate_in');
+const myChart_net_rate_in = new Chart(ctx_net_rate_in, {
+	type: 'line',
+	data: {
+		labels: ['{{data1_result['data']['time_seq']| join("','")}}'] ,
+			datasets: [
+				{label: '接收数据(字节)',
+				data:[{{data1_result['data']['Bytes_received']|join(",")}}],
+				backgroundColor:"rgb(54, 162, 235)",
+				//yAxisID:'A',
+				fill: true,
+				},
+				{label: '发送数据(字节)',
+				data:[{{data1_result['data']['Bytes_sent']|join(",")}}],
+				backgroundColor:"rgb(255, 99, 132)",
+				//yAxisID:'A',
+				fill: true,
+				},
+				]
+		
+	},
+ options: {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+      }
+    }
+  },
+});
+myChart_net_rate_in.canvas.parentNode.style.height = '50vh';
+myChart_net_rate_in.canvas.parentNode.style.width = '100vh';
+</script>
 
 <h3>INNODB读写数据速度(Innodb_data_read/Innodb_data_written)</h3>
 <div>
@@ -1603,16 +459,16 @@ const ctx_innodb_read= document.getElementById('innodb_read');
 const myChart_innodb_read= new Chart(ctx_innodb_read, {
 	type: 'line',
 	data: {
-		labels: ['{{data['innodb_read']['data']['time']| join("','")}}'] ,
+		labels: ['{{data1_result['data']['time_seq']| join("','")}}'] ,
 			datasets: [
 				{label: 'INNODB READ(字节)',
-				data:[{{data['innodb_read']['data']['data']|join(",")}}],
+				data:[{{data1_result['data']['Innodb_data_read']|join(",")}}],
 				backgroundColor:"rgb(54, 162, 235)",
 				//yAxisID:'A',
 				fill: true,
 				},
 				{label: 'INNODB WRITE(字节)',
-				data:[{{data['innodb_write']['data']['data']|join(",")}}],
+				data:[{{data1_result['data']['Innodb_data_written']|join(",")}}],
 				backgroundColor:"rgb(255, 99, 132)",
 				//yAxisID:'A',
 				fill: true,
@@ -1645,19 +501,19 @@ const ctx_tps_qps = document.getElementById('tps_qps');
 const myChart_tps_qps = new Chart(ctx_tps_qps, {
 	type: 'line',
 	data: {
-		labels: ['{{data['tps_qps']['data']['time']| join("','")}}'] ,
+		labels: ['{{data1_result['data']['time_seq']| join("','")}}'] ,
 			datasets: [
-				{label: 'TPS(平均:{{data['tps_qps']['data']['avg1']}})',
-				data:[{{data['tps_qps']['data']['data1']|join(",")}}],
+				{label: 'TPS',
+				data:[{{data1_result['data']['_commit_rollback']|join(",")}}],
 				backgroundColor:"rgb(54, 162, 235)",
 				//yAxisID:'A',
-				fill: true,
+				//fill: true,
 				},
-				{label: 'QPS(平均:{{data['tps_qps']['data']['avg2']}})',
-				data:[{{data['tps_qps']['data']['data2']|join(",")}}],
+				{label: 'QPS',
+				data:[{{data1_result['data']['Queries']|join(",")}}],
 				backgroundColor:"rgb(255, 99, 132)",
 				//yAxisID:'A',
-				fill: true,
+				//fill: true,
 				},
 				]
 		
@@ -1687,20 +543,14 @@ const ctx_redo_log_write = document.getElementById('redo_log_write');
 const myChart_redo_log_write= new Chart(ctx_redo_log_write, {
 	type: 'line',
 	data: {
-		labels: ['{{data['redo_log_write']['data']['time']| join("','")}}'] ,
+		labels: ['{{data1_result['data']['time_seq']| join("','")}}'] ,
 			datasets: [
-				{label: 'redo log write(平均:{{data['redo_log_write']['data']['avg']}})',
-				data:[{{data['redo_log_write']['data']['data']|join(",")}}],
+				{label: 'redo log write',
+				data:[{{data1_result['data']['Innodb_os_log_written']|join(",")}}],
 				backgroundColor:"rgb(54, 162, 235)",
 				//yAxisID:'A',
 				fill: true,
 				},
-				//{label: 'QPS(平均:{{data['tps_qps']['data']['avg2']}})',
-				//data:[{{data['tps_qps']['data']['data2']|join(",")}}],
-				//backgroundColor:"rgb(255, 99, 132)",
-				////yAxisID:'A',
-				//fill: true,
-				//},
 				]
 		
 	},
@@ -1720,7 +570,6 @@ myChart_redo_log_write.canvas.parentNode.style.height = '50vh';
 myChart_redo_log_write.canvas.parentNode.style.width = '100vh';
 </script>
 
-
 <h3>SQL执行情况</h3>
 <div>
 <canvas id="com_sql" width="100" height="50"></canvas>
@@ -1730,25 +579,25 @@ const ctx_com_sql= document.getElementById('com_sql');
 const myChart_com_sql= new Chart(ctx_com_sql, {
 	type: 'line',
 	data: {
-		labels: ['{{data['com_sql']['data']['time']| join("','")}}'] ,
+		labels: ['{{data1_result['data']['time_seq']| join("','")}}'] ,
 			datasets: [
 				{label: 'Select',
-				data:[{{data['com_sql']['data']['data1']|join(",")}}],
+				data:[{{data1_result['data']['Com_select']|join(",")}}],
 				backgroundColor:"rgb(54, 162, 235)",
 				//fill: true,
 				},
 				{label: 'Delete',
-				data:[{{data['com_sql']['data']['data2']|join(",")}}],
+				data:[{{data1_result['data']['Com_delete']|join(",")}}],
 				backgroundColor:"rgb(255, 99, 132)",
 				//fill: true,
 				},
 				{label: 'Update',
-				data:[{{data['com_sql']['data']['data3']|join(",")}}],
+				data:[{{data1_result['data']['Com_update']|join(",")}}],
 				backgroundColor:"rgb(255, 205, 86)",
 				//fill: true,
 				},
 				{label: 'Insert',
-				data:[{{data['com_sql']['data']['data4']|join(",")}}],
+				data:[{{data1_result['data']['Com_insert']|join(",")}}],
 				backgroundColor:"rgb(25, 202, 173)",
 				//fill: true,
 				},
@@ -1770,70 +619,79 @@ const myChart_com_sql= new Chart(ctx_com_sql, {
 myChart_com_sql.canvas.parentNode.style.height = '50vh';
 myChart_com_sql.canvas.parentNode.style.width = '100vh';
 </script>
-<!--
-<h1>汇总信息</h1>
-<pre>data2: {{data2}}</pre> 
-{%for z in data1%}<pre>{{z}}:{{data1[z]}}</pre>{%endfor%}</br>
-{%for x in data%}
-<h1>{{x}} {%for y in c%}{%if y['Object_name'] == x%}{{y['Des']}}{%endif%}{%endfor%}</h1>
-<pre>{{data[x]}}</pre>
-{%endfor%}
- -->
+{%endif%}
 
 
-
+<!-- 巡检项详情 -->
+{%for inspection_item in data%}
+	{%if inspection_item not in ['aa','bb'] and data[inspection_item]['type'] != 5 and data[inspection_item]['status'] %}
+<div>
+	</br><h3 id='{{inspection_item}}' title='{{inspection_item}}'>{{data[inspection_item]['des']}}</h3>
+	<div>
+	<table {%if data[inspection_item]['data_rows'] <= 10 %}class='table table-hover'{%endif%} id='table_{{inspection_item}}'>
+		<thead>
+			<tr>
+			{%for row in data[inspection_item]['data']%}
+				<th>{{row}}</th>
+			{%endfor%}
+			</tr>
+		</thead>
+		<tbody>
+			{%for row in data[inspection_item]['data'].values%}
+			<tr>
+				{% for col in row%}
+				<td>{{col}}</td>
+				{% endfor %}
+			</tr>
+			{%endfor%}
+		</tbody>
+	</table>
+	</div>
+	{%if data[inspection_item]['data_rows'] > 10%}
 	<script>
-		var $table_inspection_item = $('#inspection_item')
+		var $table1_{{inspection_item}} = $('#table_{{inspection_item}}')
 		$(function (){
-			$table_inspection_item.bootstrapTable({
-				sortable: true,
+			$table1_{{inspection_item}}.bootstrapTable({
+				//sortable: true,
 				pagination: true,
 				pageList: [10, 20, 30, 100],
 				search: true,
 				showColumns: true,
-				showToggle: true,
-				clickToSelect: true,
+				//showToggle: true,
+				//clickToSelect: true,
 				//showRefresh: true,
 				columns : [
-					{
-					field: 'Object_name',
-					title:'巡检项',
-					sortable: true,
-					},
-					{
-					field: 'des',
-					title:'描述',
-					sortable: true,
-					},
-					{
-					field: 'status',
-					title:'是否巡检成功',
-					sortable: true,
-					},
-					{
-					field: 't1',
-					title:'分类',
-					sortable: true,
-					},
-					{
-					field: 'get_score',
-					title:'得分',
-					sortable: true,
-					},
-					{
-					field: 'total_score',
-					title:'总分',
-					sortable: true,
-					},
-					{
-					field: 'type',
-					title:'巡检状态',
-					sortable: true,
-					},
-				],
-
+				{%for row in data[inspection_item]['data']%}
+				{field:'{{row}}'},
+				{%endfor%}
+				]
 			})
 		})
 	</script>
-</body>
+	{%endif%}
+</div>
+	{%endif%}
+{%endfor%}
+
+
+<!-- 建议 -->
+</br>
+<h3>建议</h3>
+<table class='table table-hover'>
+{%for s in baseinfo['inspection_suggestion']%}
+<tr><td>
+{{s}}
+</td></tr>
+{%endfor%}
+</table>
+
+<!--
+{{baseinfo}}
+{{hostdata}}
+{%for i in data%}
+{{data[x]}}
+{%endfor%}
+-->
+<!-- {{data1_result}} -->
+<body>
 </html>

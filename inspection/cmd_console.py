@@ -1,11 +1,13 @@
-from . import ddcw_inspection
-from . import log
 from multiprocessing import Process, Manager, Queue
 import yaml
 import sys
 import os
 import time
-from . import format_mf
+from inspection import manager_inspection
+from inspection import hashstr
+from inspection import work_inspection
+from . import parse_MF
+from inspection import work_relation
 
 class inspection():
 	def __init__(self,parser):
@@ -20,138 +22,155 @@ class inspection():
 		self.ssh_pkey = parser.SSH_PKEY
 
 		self.mf = parser.MF
+		self.af = parser.af
 		self.conf_file = parser.CONF_FILE
-		self.saved_file = parser.SAVED_FILE
+		#self.saved_file = parser.SAVED_FILE
 
-	def run(self,*args,**kwargs):
-
+		conf_file = parser.CONF_FILE
 		try:
-			inf = open(self.conf_file, 'r', encoding="utf-8")
-			inf_data =  inf.read()
-			inf.close()
+			with open(conf_file, 'r', encoding="utf-8") as f:
+				inf_data =  f.read()
 			conf = yaml.load(inf_data,Loader=yaml.Loader)
 		except Exception as e:
 			print(e)
 			sys.exit(1)
-			
 
-		#初始化日志文件
-		logfile = conf["GLOBAL"]["Log_file"]
-		if (logfile is None) or logfile == "":
-			logfile = "logs/task_{time}.log".format(time=time.strftime("%Y%m%d_%H%M%S", time.localtime()))
-		logfile = os.path.abspath(logfile) #格式化为绝对路径
-		logfile_dir = os.path.dirname(logfile)
-		os.makedirs(logfile_dir, exist_ok = True) #创建日志目录
-		#logs = log.log(logfile=logfile) #每个进程自己创建, 这样记录的信息格式才不会相互覆盖
+		self.c = conf
 
+		#是否启用命令行巡检
+		_INNER_ENABLE_CONSOLE = True
 
-		global inspection_result
-		inspection_result = {}
+		manager_host = conf['MANAGER']['host']
+		manager_port = int(conf['MANAGER']['port'])
+		manager_authkey = hashstr.hash1(conf['MANAGER']['authkey'])
 
-		def display_state(d,):
-			fail_list = []
-			lastmsg = "" #和上次输出一样的话, 就不输出了.
-			while True:
-				if d['stat'] == 1:
-					msg = "[{pid}] {host}:{port} 运行中... 当前进度:{running} ".format(pid=d['pid'],host=d['host'],port=d['port'],running=d['running'])
-					if msg != lastmsg:
-						print(msg)
-						lastmsg = msg
-				elif d['stat'] == 0:
-					continue
-				elif d['stat'] == 2:
-					msg = "[{pid}] {host}:{port} 巡检完成, 巡检报告:{result}".format(pid=d['pid'],host=d['host'],port=d['port'],result=d['result'])
-					inspection_result['{host}_{port}'.format(host=d['host'],port=d['port'])] = msg
-					if msg != lastmsg:
-						print(msg)
-						lastmsg = msg
-				elif d['stat'] == 3:
-					fail_list_name = "{host}_{port}".format(host=d['host'],port=d['port'])
-					if fail_list_name in fail_list:
-						continue
-					else:
-						msg = "[{pid}] {host}:{port} 巡检失败,请查看日志 {logfile}".format(pid=d['pid'],host=d['host'],port=d['port'],logfile=logfile)
-						inspection_result['{host}_{port}'.format(host=d['host'],port=d['port'])] = msg
-						if msg != lastmsg:
-							print(msg)
-							lastmsg = msg
-						fail_list.append(fail_list_name)
-				elif d['stat'] == 99:
-					break
-				else:
-					continue
-				time.sleep(0.5)
-			return True
-
-		taskname = "task_{time}".format(time=time.strftime("%Y%m%d_%H%M%S", time.localtime()))
-		#多实例巡检
-		if self.mf is not None:
-			mf = open(self.mf, 'r', encoding="utf-8")
-			mf_data = mf.read()
-			mf.close()
-			mfconf = yaml.load(mf_data,Loader=yaml.Loader)
-			
-			with Manager() as manager:
-				#d = manager.dict() #貌似不支持二维数组, 但是每个值都支持dict, 所以也能实现二维数组... 但又不能修改值了, 还是拆开吧...
-				q = manager.Queue(len(mfconf['DATA']))
-				#l = logs
-				c = conf
-
-				#初始化队列和字典
-				#mf_list 要巡检的实例列表
-				mf_list = mfconf['DATA'] #后续考虑格式化 TODO
-				for x in mf_list:
-					q.put(x)
-	
-				thread_list={}
-				dthread_list={}
-				d = {}
-				for p in range(0,mfconf['GLOBAL']['PARALLEL']):
-					d[p] = manager.dict()
-					d[p]['stat'] = 0
-					d[p]['running'] = "waiting"
-					thread_list[p] = Process(target=ddcw_inspection.inspection, args=(q,c,logfile,d[p], taskname),)
-					dthread_list[p] = Process(target=display_state, args=(d[p],),)
-				for p in range(0,mfconf['GLOBAL']['PARALLEL']):
-					thread_list[p].start()
-					dthread_list[p].start()
-				for p in range(0,mfconf['GLOBAL']['PARALLEL']):
-					thread_list[p].join()
-					dthread_list[p].join()
+		inspection_instance = manager_inspection.inspection()
+		manager_instance = manager_inspection.task_manager()
+		if manager_instance.test_conn(manager_host,manager_port,manager_authkey):
+			print('已连接manager.... 将等待 {h} 下发任务'.format(h=manager_host))
+			_INNER_ENABLE_CONSOLE = False
 
 		else:
-			with Manager() as manager:
-				inspection_one = {
-					'host':self.host,
-					'port':self.port,
-					'password':self.password,
-					'user':self.user,
-					'socket':self.socket,
-					'ssh_port':self.ssh_port,
-					'ssh_user':self.ssh_user,
-					'ssh_password':self.ssh_password,
-					'ssh_pkey':self.ssh_pkey,
-				}
-				inspection_one = format_mf.formatc(inspection_one)
-				q = manager.Queue(1)
-				q.put(inspection_one)
-				#l = logs
-				c = conf
-				d = manager.dict()
-				d['stat'] = 0
-				d['running'] = 'waiting'
-				p = Process(target=ddcw_inspection.inspection, args=(q,c,logfile,d, taskname),)
-				pd = Process(target=display_state, args=(d,),)
-				p.start()
-				pd.start()
-				p.join()
-				pd.join()
-			#print("单机巡检")
+			try:
+				manager_process = Process(target=manager_instance.start, args=(manager_host,manager_port,manager_authkey,inspection_instance),)
+				manager_process.start()
+			except Exception as e:
+				print(e)
+				sys.exit(1)
 
-			
+		self.manager_host = manager_host
+		self.manager_port = manager_port
+		self.manager_authkey = manager_authkey
 
-		#print(inspection_result)
-			
+		#启动work进程(非阻塞方式)
+		PARALLEL = int(conf['OTHER']['parallel'])
+		thread_list = {}
+		for p in range(0,PARALLEL):
+			thread_list[p] = Process(target=work_inspection.inspection, kwargs={'conf':self.c},)
+		for p in range(0,PARALLEL):
+			thread_list[p].start()
+			#print(p,' start')
+
+		#启动relation_work进程
+		relation_work = Process(target=work_relation.relation, kwargs={'conf':self.c})
+		relation_work.start()
+
+		self.relation_work = relation_work
+
+		self.thread_list = thread_list
+		self.PARALLEL = PARALLEL
+		self.manager_process = manager_process
+		#本机连上manager
+		manager_instance = manager_inspection.task_manager()
+		m = manager_instance.conn(manager_host,manager_port,manager_authkey)
+		q = m.task_queue() #将要巡检的队列
+		queue_relation = m.queue_relation()
+		inspection_task = m.inspection() #task相关的信息
+		self.q = q
+		self.inspection_task = inspection_task
+		self.queue_relation = queue_relation
+		self._INNER_ENABLE_CONSOLE = _INNER_ENABLE_CONSOLE
+
+
+	def run(self,*args,**kwargs):
+		if not self._INNER_ENABLE_CONSOLE:
+			time.sleep(10000000)
+		c = self.c
+		q = self.q
+		queue_relation = self.queue_relation
+		Tmp_dir = c['OTHER']['report_dir']
+		inspection_file = c['OTHER']['inspection']
+		with open(inspection_file, 'r', encoding="utf-8") as f:
+			inf_data =  f.read()
+		inspection_conf = yaml.load(inf_data,Loader=yaml.Loader)
+
+		#初始化task
+		inspection_task = self.inspection_task
+		taskid = "task_{time}".format(time=time.strftime("%Y%m%d_%H%M%S", time.localtime())) #生成一个taskid
+		inspection_task.init_task(taskid)
+
+		#初始化巡检队列
+		#多实例巡检
+		if self.mf is not None:
+			with open(self.mf, 'r', encoding="utf-8") as f:
+				inf_data =  f.read()
+			mfobj = yaml.load(inf_data,Loader=yaml.Loader)
+			inspection_task.set_task(taskid,'total',len(mfobj['DATA']))
+			for x in parse_MF.get_result(mfobj):
+				x['taskid'] = taskid
+				x['data'] = {'havedata':False,'data':'xxx.xml'}
+				q.put(x)
+			if self.c['OTHER']['node_relation']:
+				self.queue_relation.put(taskid)
+		elif self.af is None:
+			inspection_task.set_task(taskid,'total',1)
+			_tmp_q1 = {'host':self.host,'port':self.port,'user':self.user,'password':self.password,'socket':self.socket,'sshport':self.ssh_port,'sshuser':self.ssh_user,'sshpassword':self.ssh_password,'sshpkey':self.ssh_pkey,'sshenable':True,'sshforce':False,'taskid':taskid,'data':{'havedata':False,'data':'xxx.xml'}}
+			q.put(_tmp_q1)
+
+		elif self.af is not None:
+			print('开始分析采集数据, 并生成巡检报告')
+			_tmp_q2 = {'data':{'havedata':True,'data':self.af}, 'taskid':taskid}
+			q.put(_tmp_q2)
+			#time.sleep(1000)
+		else:
+			print('啥都没....')
+			return False
+
+
+		time.sleep(3)
+		while True:
+			jindu = inspection_task.get_task_jindu(taskid)
+			complete_n = jindu[0]
+			total_n = jindu[1]
+			if complete_n < total_n:
+				print('进度:{a}/{b}'.format(a=complete_n,b=total_n))
+				time.sleep(3)
+			else:
+				break
+		print('巡检完成. 巡检报告如下:')
+		task_result = inspection_task.get_task(taskid)
+		for x in task_result['list']:
+			report_result = inspection_task.get_task_detail(x)['result']
+			i_host = inspection_task.get_task_detail(x)['host']
+			i_port = inspection_task.get_task_detail(x)['port']
+			if len(report_result) == 0:
+				print('{host}:{port} 巡检失败, 请查看日志'.format(host=i_host,port=i_port))
+			for y in inspection_task.get_task_detail(x)['result']:
+				print('{host}:{port} 巡检报告({report_type}):{report}'.format(host=i_host,port=i_port,report=y['data'],report_type=y['type']))
+
+
+		#如果要分析节点关系, 就等一会
+		if self.c['OTHER']['node_relation']:
+			print('分析节点关系中, wait....')
+			while inspection_task.get_task(taskid)['relation'] == '':
+				time.sleep(1)
+				print(inspection_task.get_task(taskid)['relation'])
+			print('节点关系csv文件: {f}'.format(f=inspection_task.get_task(taskid)['relation']))
+
+		for p in range(0,self.PARALLEL):
+			self.thread_list[p].terminate()
+		self.manager_process.terminate()
+		self.relation_work.terminate()
+		#sys.exit(0)
 		return True
-
 
