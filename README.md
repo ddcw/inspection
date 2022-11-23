@@ -24,6 +24,20 @@ mysql 5.7/8.0 单主, 主从, 主主, MGR, PXC
 
 # 使用
 
+## 创建巡检用户并授权(可以跳过)
+
+```mysql
+
+create user 'u1'@'%' identified by '123456';
+
+grant select on *.* to 'u1'@'%';
+
+grant replication client on *.* to 'u1'@'%';
+
+grant execute on *.* to 'u1'@'%';
+
+```
+
 ## 命令行巡检
 
 巡检报告默认均在 tmp目录下面(配置文件指定的路径)
