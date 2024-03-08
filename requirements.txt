@@ -1,0 +1,8 @@
+pyyaml
+paramiko
+pymysql
+pandas
+docx
+python-docx
+gevent
+flask
