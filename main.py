@@ -33,7 +33,7 @@ def _argparse():
 if __name__ == '__main__':
 	parser = _argparse()
 	if parser.VERSION:
-		print("VERSION: v2.2")
+		print("VERSION: v2.3")
 		sys.exit(0)
 
 	#启动manager进程
