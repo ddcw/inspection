@@ -1,8 +1,7 @@
-pyyaml
+PyYAML
 paramiko
-pymysql
+PyMySQL
 pandas
-docx
 python-docx
 gevent
-flask
+Flask
