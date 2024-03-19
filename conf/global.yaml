@@ -36,7 +36,7 @@ OTHER:
   parallel : 4 #work的并发进程.  
   raw_coll_data_save : False #是否保存原生的采集数据. 用于分析数据, 生成巡检报告 (不支持)
   raw_ana_data_save : False #是否保存巡检后的原生数据(巡检报告的原始数据, 可用于生成巡检报告)
-  node_relation : True #是否构建节点关系 True:是  如果为True时, 会在生成完成之后再返回'成功'给客户端(不影响巡检报告的生成)
+  node_relation : False #是否构建节点关系 True:是  如果为True时, 会在生成完成之后再返回'成功'给客户端(不影响巡检报告的生成)
   #node_relation_save : True #是否保存节点关系结果, 仅支持CSV  不保存的话, 就只有内存有, 重启就没了
   node_relation_file : 'tmp' #节点关系保存路径
   report_dir : 'tmp' #巡检报告存放目录

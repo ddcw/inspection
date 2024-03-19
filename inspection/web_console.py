@@ -182,7 +182,7 @@ class web_inspection:
 					return_task_detail[x]['port'] = task_detail_list[x]['port']
 					return_task_detail[x]['begin_time'] = task_detail_list[x]['begin_time']
 					return_task_detail[x]['end_time'] = task_detail_list[x]['end_time']
-					return_task_detail[x]['running'] = task_detail_list[x]['running']
+					return_task_detail[x]['running'] = str(task_detail_list[x]['running'])
 					return_task_detail[x]['stat'] = task_detail_list[x]['stat']
 					return_task_detail[x]['score'] = task_detail_list[x]['score']
 					return_task_detail[x]['result'] = task_detail_list[x]['result']

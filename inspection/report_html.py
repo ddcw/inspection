@@ -14,6 +14,7 @@ def run(c,data1_result,baseinfo,inspection_data_result,hostdata):
 
 	report_filepath = os.path.abspath(baseinfo['report_dir'])
 	report_filename = '{taskid}_{host}_{port}_{time}.html'.format(taskid=baseinfo['taskid'], task_detail_id=baseinfo['task_detail_id'], host=baseinfo['host'], port=baseinfo['port'], time=str(int(time.time()))) #要返回的巡检报告的名字
+	os.makedirs(report_filepath,exist_ok=True) #2023.03.19 创建tmp目录
 	report_file = str(report_filepath) + '/' + str(report_filename) #用于生成巡检报告的(绝对路径)
 
 

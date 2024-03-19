@@ -353,7 +353,7 @@ def inspection(**kwargs):
 		try:
 			baseinfo['query_cache_hits'] = round(int(data2['global_status']['data']['Qcache_hits'].values[0])/(int(data2['global_status']['data']['Qcache_hits'].values[0])+int(data2['global_status']['data']['Qcache_inserts'].values[0])),2)
 		except Exception as e:
-			msg1(e)
+			msg1(f"{e} 777777777777777")
 			baseinfo['query_cache_hits'] = -1
 		try:
 			baseinfo['innodb_buffer_read_hits'] = round((1-int(data2['global_status']['data']['Innodb_buffer_pool_reads'].values[0])/(int(data2['global_status']['data']['Innodb_buffer_pool_reads'].values[0])+int(data2['global_status']['data']['Innodb_buffer_pool_read_requests'].values[0])+int(data2['global_status']['data']['Innodb_buffer_pool_read_ahead'].values[0])))*100,2)
@@ -366,17 +366,22 @@ def inspection(**kwargs):
 			msg1(e)
 			baseinfo['table_open_cache_hits'] = -1
 		#内存使用
+		msg1("innodb_mem_used_p")
 		try:
 			baseinfo['innodb_mem_used_p'] = round(int(data2['global_status']['data']['Innodb_buffer_pool_pages_data'].values[0])/int(data2['global_status']['data']['Innodb_buffer_pool_pages_total'].values[0])*100,2)
 		except Exception as e:
 			msg1(e)
 			baseinfo['innodb_mem_used_p'] = -1
+		msg1("innodb_mem_total")
 		baseinfo['innodb_mem_total'] = round(int(data2['global_status']['data']['Innodb_buffer_pool_bytes_data'].values[0])/1024/1024,2) #MB
 		#建议
+		msg1("inspection_suggestion")
 		baseinfo['inspection_suggestion'] = inspection_suggestion
 		#库表信息
+		msg1("db_table_info")
 		baseinfo['db_table'] = data2['db_table_info']
 
+		msg1("radar")
 		#雷达图要的数据(word版不支持)
 		baseinfo['radar'] = {}
 		_tmp_radar_1 = {} #总分
@@ -387,18 +392,22 @@ def inspection(**kwargs):
 				try:
 					_tmp_radar_1[radar_type] += inspection_data_result[x]['old_score']
 					_tmp_radar_2[radar_type] += inspection_data_result[x]['score']
-				except:
+				except Exception as e:
+					msg1(e)
 					_tmp_radar_1[radar_type] = inspection_data_result[x]['old_score']
 					_tmp_radar_2[radar_type] = inspection_data_result[x]['score']
 
+		msg1("radar finish")
 		for y in _tmp_radar_1:
 			try:
 				baseinfo['radar'][y] = round(_tmp_radar_2[y]/_tmp_radar_1[y]*100,0)
 			except:
 				baseinfo['radar'][y] = 100
 
+		msg1("radar_name")
 		baseinfo['radar_name'] = []
 		baseinfo['radar1'] = []
+		msg1("radar inspection_type")
 		for z in baseinfo['radar']:
 			baseinfo['radar_name'].append(c['OTHER']['inspection_type'][z][0])
 			baseinfo['radar1'].append(baseinfo['radar'][z])
@@ -412,12 +421,15 @@ def inspection(**kwargs):
 
 		#生成巡检报告
 		report_result = [] #{'type:html, status:True,data:xxx.html'}
+		msg1("waiting for report_html")
 		if c['OTHER']['report_html']:
 			report_result.append(report_html.run(c,data1_result,baseinfo,inspection_data_result,hostdata))
+		msg1("waiting for report_docx")
 		if c['OTHER']['report_docx']:
 			report_result.append(report_docx.run(c,data1_result,baseinfo,inspection_data_result,hostdata))
 
 
+		msg1("report_finish")
 		inspection.set_task_detail(task_detail_id,'result',report_result)
 		inspection.set_task_detail(task_detail_id,'end_time',end_time)
 		inspection.set_task_detail(task_detail_id,'running','巡检完成')

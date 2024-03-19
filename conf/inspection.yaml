@@ -19,16 +19,16 @@ INSPECTION:
     score : 5
     type : 4
     opt : 0  # 0 >=  1 >  2 <=  3 <  4 in  5 not in #仅参考, 不是只用这些
-    suggestion : '建议每张表都设置主键' #优先级低于level里面具体的
+    suggestion : '存在无主键的表, 建议每张表都设置主键' #优先级低于level里面具体的
     level : 
       - level : 3
         condition : {'count':5,}
         des : '无主键的表较多'
-        suggestion : '建议每张表都设置主键'
+        suggestion : '存在部分无主键的表,建议每张表都设置主键'
       - level : 4
         condition : {'count':20,}
         des : '无主键的表很多'
-        suggestion : '建议每张表都设置主键'
+        suggestion : '存在较多无主键的表,建议每张表都设置主键'
 
   - object_name : 'redundant_indexes' #冗余索引
     des : '冗余索引'
@@ -37,8 +37,8 @@ INSPECTION:
     score : 2
     type : 4
     opt : 0
-    suggestion : '建议删掉冗余索引'
-    level : [{'level':3, 'condition':{'count':5,}, 'des':'冗余索引较多'},  {'level':4, 'condition':{'count':50,}, 'des':'冗余索过多'},]
+    suggestion : '存在部分冗余索引, 建议删掉冗余索引'
+    level : [{'level':3, 'condition':{'count':5,}, 'des':'冗余索引较多, 建议删除冗余索引'},  {'level':4, 'condition':{'count':50,}, 'des':'冗余索过多, 建议删除冗余索引'},]
 
   - object_name : 'unused_indexes'
     des : '未使用的索引'
@@ -46,7 +46,7 @@ INSPECTION:
     score : 2
     type : 1
     opt : 0
-    suggestion : '建议删掉长时间未使用的索引(仅供建议)'
+    suggestion : '存在部分未使用的索引,建议删掉长时间未使用的索引(仅供建议,若数据库启动时间不长, 则忽略本建议)'
     level : [{'level':2, 'condition':{'count':10,},}, {'level':3, 'condition':{'count':120,},},]
   
   - object_name : 'full_table_scans'
@@ -55,7 +55,7 @@ INSPECTION:
     score : 1
     type : 2
     opt : 0
-    suggestion : '尽量避免全表扫描'
+    suggestion : '存在使用全表扫描的SQL, 应尽量避免全表扫描, 建议SQL加上条件过滤数据'
     level : [{'level':2, 'condition':{'count':100,}}, {'level':3, 'condition':{'count':1000,},}]
 
   - object_name : 'auto_increment_columns'
@@ -64,7 +64,7 @@ INSPECTION:
     score : 1
     type : 4
     opt : 0
-    suggestion : ''
+    suggestion : '存在自增键使用率过高的表, 注意观察该表的自增键增长率'
     level : [{'level':2, 'condition':{'count':1,}}, {'level':3, 'condition':{'count':5,},}]
 
   - object_name : 'special_column'
@@ -73,7 +73,7 @@ INSPECTION:
     score : 1
     type : 4
     opt : 0
-    suggestion : '建议不要使用特殊字段(大字段)'
+    suggestion : '存在部分字段为特殊字段, 建议不要使用特殊字段(大字段)'
     level : [{'level':2, 'condition':{'count':10,}}, {'level':3, 'condition':{'count':100,},}]
 
   - object_name : 'big_table'
@@ -82,7 +82,7 @@ INSPECTION:
     score : 2
     type : 4
     opt : 0
-    suggestion : ''
+    suggestion : '存在部分大表, 建议拆分表.'
     level : [{'level':2, 'condition':{'count':10,}}, {'level':3, 'condition':{'count':100,},}]
 
   - object_name : 'cold_table'
@@ -91,7 +91,7 @@ INSPECTION:
     score : 2
     type : 4
     opt : 0
-    suggestion : '建议归档冷表'
+    suggestion : '存在部分冷表, 建议归档冷表'
     level : [{'level':2, 'condition':{'count':10,}}, {'level':4, 'condition':{'count':100,},}]
 
   - object_name : 'partition_table'
@@ -105,7 +105,7 @@ INSPECTION:
 
   - object_name : 'is_nullable'
     des : '可为空的字段'
-    sql : "select TABLE_SCHEMA,TABLE_NAME,COLUMN_NAME,IS_NULLABLE from information_schema.columns where IS_NULLABLE='YES' and table_schema not in ('sys','information_schema','mysql','performance_schema');"
+    sql : "select TABLE_SCHEMA,TABLE_NAME,COLUMN_NAME,IS_NULLABLE from information_schema.columns where IS_NULLABLE='YES' and table_schema not in ('sys','information_schema','mysql','performance_schema') limit 20;"
     score : 1
     type : 4
     opt : 0
@@ -118,7 +118,7 @@ INSPECTION:
     score : 2
     type : 4
     opt : 0
-    suggestion : '建议使用InnoDB的表(仅供建议,请以实际需求为主)'
+    suggestion : '存在非innodb表, 建议使用InnoDB的表(仅供建议,请以实际需求为主)'
     level : [{'level':2, 'condition':{'count':2,}}, {'level':3, 'condition':{'count':10,},}, {'level':4, 'condition':{'count':20,},},]
 
   - object_name : 'table_static_expired'
@@ -127,7 +127,7 @@ INSPECTION:
     score : 1
     type : 6
     opt : 0
-    suggestion : '建议手动更新统计信息(analyze table table_name)'
+    suggestion : '存在部分长时间未收集统计信息的表, 若该表为常用表,建议手动更新统计信息(analyze table table_name)'
     level : [{'level':2, 'condition':{'count':5,}}, {'level':3, 'condition':{'count':10,},}]
 
   - object_name : 'fragment_table'
@@ -136,7 +136,7 @@ INSPECTION:
     score : 3
     type : 1
     opt : 0
-    suggestion : '建议清理碎片表(比如导出再导入)'
+    suggestion : '存在部分碎片表, 建议清理碎片表(optimize table tablename; analyze table tablename)'
     level : [{'level':2, 'condition':{'count':5,}}, {'level':4, 'condition':{'count':20,},}]
 
   - object_name : 'same_user_password'
@@ -145,7 +145,7 @@ INSPECTION:
     score : 2
     type : 2
     opt : 0
-    suggestion : '账号密码一样不安全, 建议整个复杂点的密码'
+    suggestion : '存在用户名和密码一样的账号, 建议修改该部分账号的密码'
     level : [{'level':3, 'condition':{'count':1,}}, {'level':4, 'condition':{'count':5,},}]
 
   - object_name : 'expired_password'
@@ -154,7 +154,7 @@ INSPECTION:
     score : 1
     type : 2
     opt : 0
-    suggestion : '部分账号密码过期了,请注意及时修改'
+    suggestion : '存在部分账号密码过期了,请注意及时修改'
     level : [{'level':2, 'condition':{'count':1,}}, {'level':3, 'condition':{'count':5,},}]
 
   - object_name : 'any_host'
@@ -163,7 +163,7 @@ INSPECTION:
     score : 1
     type : 2
     opt : 0
-    suggestion : '建议限制用户访问的网段(host尽量不要用%)'
+    suggestion : '存在host为%的账号, 建议限制用户访问的网段(host尽量不要用%)'
     level : [{'level':2, 'condition':{'count':1,}}, {'level':3, 'condition':{'count':10,},}]
 
   - object_name : 'simple_password'
@@ -173,7 +173,7 @@ INSPECTION:
     score : 3
     type : 2
     opt : 0
-    suggestion : '密码太简单了(密码字典包含的密码), 建议设置复杂的密码'
+    suggestion : '存在部分账号密码太简单(密码字典包含的密码), 建议设置复杂的密码'
     level : [{'level':2, 'condition':{'count':1,}}, {'level':3, 'condition':{'count':10,},}]
 
   - object_name : 'innodb_buffer_stats_by_schema'
@@ -254,7 +254,7 @@ INSPECTION:
     score : 5
     type : 3
     opt : 0
-    suggestion : '请查看主从信息'
+    suggestion : ''
     level : [{'level':1, 'condition':{'value':['Yes'],}}, {'level':3, 'condition':{'value':['Connecting']},}, {'level':4, 'condition':{'value':['No']},},]
 
   - object_name : 'pxc_info'
@@ -264,7 +264,7 @@ INSPECTION:
     score : 5
     type : 3
     opt : 0
-    suggestion : '请查看PXC信息'
+    suggestion : ''
     level : [{'level':1, 'condition':{'value':['ON'],}}, {'level':4, 'condition':{'value':['OFF']},},]
 
   - object_name : 'mgr_info'
@@ -274,7 +274,7 @@ INSPECTION:
     score : 5
     type : 3
     opt : 0
-    suggestion : '请查看MGR信息'
+    suggestion : ''
     level : [{'level':1, 'condition':{'value':['ONLINE'],}}, {'level':2, 'condition':{'value':['RECOVERING']},}, {'level':3, 'condition':{'value':['UNREACHABLE']},}, {'level':4, 'condition':{'value':['OFFLINE','ERROR'],}},]
 
   - object_name : 'log_bin'
@@ -283,7 +283,7 @@ INSPECTION:
     score : 3
     type : 5
     opt : 0
-    suggestion : '建议开启binlog'
+    suggestion : '当前binlog为打开, 建议开启binlog'
     level : [{'level':1, 'condition':{'value':['ON'],}}, {'level':4, 'condition':{'value':['OFF'],},}]
 
   - object_name : 'default_storage_engine'
@@ -292,7 +292,7 @@ INSPECTION:
     score : 2
     type : 5
     opt : 0
-    suggestion : '建议设置默认存储引擎为InnoDB'
+    suggestion : '当前默认存储引擎参数(default_storage_engine)值为非innodb, 建议设置默认存储引擎为InnoDB'
     level : [{'level':1, 'condition':{'value':['InnoDB'],}}, ]
 
   - object_name : 'innodb_flush_log_at_trx_commit'
@@ -301,7 +301,7 @@ INSPECTION:
     score : 4
     type : 5
     opt : 0
-    suggestion : '建议设置innodb_flush_log_at_trx_commit=1'
+    suggestion : '双1: 建议设置innodb_flush_log_at_trx_commit=1'
     level : [{'level':1, 'condition':{'value':['1'],}}, ]
 
   - object_name : 'sync_binlog'
@@ -310,7 +310,7 @@ INSPECTION:
     score : 4
     type : 5
     opt : 0
-    suggestion : '建议设置sync_binlog=1'
+    suggestion : '双1: 建议设置sync_binlog=1'
     level : [{'level':1, 'condition':{'value':['1'],}}, ]
 
   - object_name : 'general_log'
@@ -319,7 +319,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议关闭general_log'
+    suggestion : '当前general_log是打开的, 建议关闭general_log, 以节省空间(若存在审计等需求, 则忽略本建议)'
     level : [{'level':1, 'condition':{'value':['0'],}}, ]
 
   - object_name : 'slow_query_log'
@@ -328,7 +328,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议开启慢日志记录'
+    suggestion : '当前未开启慢日志, 建议开启慢日志记录'
     level : [{'level':1, 'condition':{'value':['1'],}}, ]
 
   - object_name : 'transaction_isolation'
@@ -346,7 +346,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : 'innodb_buffer_pool_size建议大于1GB. 如果是独立的MYSQL数据库服务器, 可以设置内存 60%-80%物理内存'
+    suggestion : 'innodb_buffer_pool_size建议大于1GB. 如果是独立的MYSQL数据库服务器, 可以设置内存 40%-60%物理内存'
     level : [{'level':1, 'condition':{'min':1073741824,}}, ]
 
   - object_name : 'server_id'
@@ -364,7 +364,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议大于512M, 比如1GB'
+    suggestion : 'redo log文件建议大于512M, 比如1GB'
     level : [{'level':1, 'condition':{'min':536870912}}, ]
 
   - object_name : 'innodb_log_files_in_group'
@@ -373,8 +373,8 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议最少4个一组'
-    level : [{'level':1, 'condition':{'min':4,}}, ]
+    suggestion : 'redo log 建议最少2个一组'
+    level : [{'level':1, 'condition':{'min':2,}}, ]
 
   - object_name : 'innodb_page_size'
     des : 'innodb页大小'
@@ -382,7 +382,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议16K(默认), 请以实际业务需求为主'
+    suggestion : 'innodb_page_size建议16K(默认), 请以实际业务需求为主'
     level : [{'level':1, 'condition':{'value':['16384'],}}, ]
 
   - object_name : 'innodb_doublewrite'
@@ -391,7 +391,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议开启双写'
+    suggestion : '当前未开启双写(doublewrite), 建议开启双写. 若存储可保证数据写一致性, 则可忽略本建议'
     level : [{'level':1, 'condition':{'value':['1'],}}, ]
 
   - object_name : 'gtid_mode'
@@ -400,7 +400,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议设置开启gtid'
+    suggestion : '当前未开启GTID, 建议开启gtid.'
     level : [{'level':1, 'condition':{'value':['ON','ON_PERMISSIVE'],}}, ]
 
   - object_name : 'performance_schema'
@@ -409,7 +409,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议开启performance_schema'
+    suggestion : 'performance_schema是mysql很关键的监控库, 建议开启performance_schema'
     level : [{'level':1, 'condition':{'value':['1',],}}, ]
 
   - object_name : 'binlog_format'
@@ -418,7 +418,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议设置binlog格式为row'
+    suggestion : 'binlog当前的行格式不是ROW, 建议设置binlog格式为row'
     level : [{'level':1, 'condition':{'value':['ROW',],}}, ]
 
   - object_name : 'binlog_row_image'
@@ -427,7 +427,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议记录完整的数据行(变更前后的数据), 也就是设置binlog_row_image=full'
+    suggestion : 'binlog_row_image当前为非FULL, 建议记录完整的数据行(变更前后的数据), 也就是设置binlog_row_image=full'
     level : [{'level':1, 'condition':{'value':['FULL',],}}, ]
 
   - object_name : 'max_connections'
@@ -436,7 +436,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议大于1024(仅供参考, 请根据实际业务设置)'
+    suggestion : '当前连接数较小, 建议设置max_connections=2048(仅供参考, 请根据实际业务设置)'
     level : [{'level':1, 'condition':{'min':1024}}, ]
 
   - object_name : 'innodb_io_capacity'
@@ -445,7 +445,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议大于2500'
+    suggestion : 'innodb_io_capacity当前小于2500, 建议大于2500'
     level : [{'level':1, 'condition':{'min':2500}}, ]
 
   - object_name : 'innodb_io_capacity_max'
@@ -454,7 +454,7 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议大于5000'
+    suggestion : 'innodb_io_capacity_max当前小于5000, 建议大于5000 (2倍innodb_io_capacity)'
     level : [{'level':1, 'condition':{'min':5000}}, ]
 
   - object_name : 'innodb_log_buffer_size'
@@ -463,6 +463,6 @@ INSPECTION:
     score : 1
     type : 5
     opt : 0
-    suggestion : '建议大于64MB'
+    suggestion : 'redo log buffer当前较小, 建议设置为64MB'
     level : [{'level':1, 'condition':{'min':67108864}}, ]
 
