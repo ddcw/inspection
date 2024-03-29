@@ -26,7 +26,7 @@ mysql 5.7/8.0 单主, 主从, 主主, MGR, PXC
 
 这个shell版算未完成版吧.. 但还是有参考价值的.
 
-下载地址: 
+下载地址: [https://github.com/ddcw/inspection/blob/main/ddcw_inspection_v3.0.sh](https://github.com/ddcw/inspection/blob/main/ddcw_inspection_v3.0.sh)
 
 用法:
 
