@@ -20,6 +20,21 @@ mysql 5.7/8.0 单主, 主从, 主主, MGR, PXC
 
 
 
+# mini版(SHELL版)
+
+本来准备3.0使用纯shell来写的, 但shell太有限了. 所以就取消了3.0版, 还是维持2.x版本的这种风格吧....
+
+这个shell版算未完成版吧.. 但还是有参考价值的.
+
+下载地址: 
+
+用法:
+
+```bash
+sh ddcw_inspection_v3.0.sh --help
+sh ddcw_inspection_v3.0.sh -h127.0.0.1 -P3314 -p123456 -uroot
+```
+
 
 
 # 使用
